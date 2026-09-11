@@ -12,6 +12,10 @@ readme = "README.md"
 [tool.poetry.dependencies]
 # update the Python versions in .github/workflows/check.yml if you change this
 python = ">= 3.9.0 < 4.0.0"
+fastapi = "^0.115.0"
+uvicorn = { version = "^0.30.0", extras = ["standard"] }
+psycopg = { version = "^3.2.0", extras = ["binary"] }
+pydantic-settings = "^2.5.0"
 
 [tool.poetry.group.dev.dependencies]
 coverage = "^7.4.0"
