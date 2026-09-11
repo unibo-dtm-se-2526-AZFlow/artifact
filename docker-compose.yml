@@ -1,0 +1,23 @@
+services:
+  azflow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      AZFLOW_API_HOST: ${AZFLOW_API_HOST:-0.0.0.0}
+      AZFLOW_API_PORT: ${AZFLOW_API_PORT:-8000}
+      AZFLOW_DATABASE_URL: postgresql://${POSTGRES_USER:-azflow}:${POSTGRES_PASSWORD:-azflow}@postgres:5432/${POSTGRES_DB:-azflow}
+    ports:
+      - "${AZFLOW_API_PORT:-8000}:${AZFLOW_API_PORT:-8000}"
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-azflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-azflow}
+      POSTGRES_DB: ${POSTGRES_DB:-azflow}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
