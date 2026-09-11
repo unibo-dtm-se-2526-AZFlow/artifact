@@ -24,6 +24,7 @@ poethepoet = "^0.37.0"
 poetry = "^1.8.3"
 pytest = "^8.3.5"
 ruff = "^0.15.0"
+httpx = "^0.28.1"
 
 [tool.poe.tasks]
 test = "pytest"
