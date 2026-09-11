@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "artifact"
+name = "AZFlow"
 packages = [
-    { include = "artifact" },
+    { include = "AZFlow" },
 ]
 version = "2.4.1"
 description = "A template for Python projects, using Poetry"
@@ -30,8 +30,8 @@ ruff-check = "ruff check"
 ruff-fix = "ruff check --fix"
 format = "ruff format"
 format-check = "ruff format --check"
-mypy = "mypy artifact tests"
-compile = "python -m compileall artifact tests"
+mypy = "mypy AZFlow tests"
+compile = "python -m compileall AZFlow tests"
 static-checks = [
     "ruff-check",
     "mypy",

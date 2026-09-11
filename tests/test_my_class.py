@@ -1,6 +1,6 @@
 import pytest
 
-from artifact import MyClass
+from AZFlow import MyClass
 
 
 # can test using classes, name must begin with `Test`

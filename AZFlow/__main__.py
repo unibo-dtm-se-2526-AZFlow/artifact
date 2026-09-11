@@ -1,0 +1,3 @@
+import AZFlow
+
+AZFlow.main()
