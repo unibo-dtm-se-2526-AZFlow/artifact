@@ -6,13 +6,16 @@ logger = logging.getLogger("AZFlow")
 
 
 def main() -> None:
-    """Entry point for ``python -m AZFlow``.
+    """Start the AZFlow application."""
+    import uvicorn
 
-    The application server is wired in a later step; for now this simply
-    confirms the package is runnable.
-    """
-    logger.info("AZFlow starting")
+    from AZFlow.infrastructure.config import load_settings
 
+    settings = load_settings()
+    logger.info("AZFlow starting on %s:%s", settings.api_host, settings.api_port)
 
-# let this be the last line of this file
-logger.info("AZFlow loaded")
+    uvicorn.run(
+        "AZFlow.api:app",
+        host=settings.api_host,
+        port=settings.api_port,
+    )
