@@ -4,8 +4,8 @@ packages = [
     { include = "AZFlow" },
 ]
 version = "2.4.1"
-description = "A template for Python projects, using Poetry"
-authors = ["Giovanni Ciatto <giovanni.ciatto@unibo.it>"]
+description = "AZFlow, a healthcare queue management system for outpatient environments"
+authors = ["Andrea Zaccheroni <andrea.zaccheroni@studio.unibo.it>"]
 license = "Apache 2.0"
 readme = "README.md"
 
