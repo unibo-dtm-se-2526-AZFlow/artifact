@@ -30,9 +30,9 @@ jobs:
             echo "skip=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Get Python Version
-        id: get-python-version
-        run: echo version=$(python setup.py get_minimum_python_version | tail -n 1) >> $GITHUB_OUTPUT
+      #- name: Get Python Version
+      #  id: get-python-version
+      #  run: echo version=$(python setup.py get_minimum_python_version | tail -n 1) >> $GITHUB_OUTPUT
 
       - name: Install Poetry
         run: |
@@ -60,7 +60,7 @@ jobs:
           npm install
           npx semantic-release
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           # dry run if not on main/master branch, or if initial commit
           RELEASE_DRY_RUN: ${{ steps.skip_release.outputs.skip == 'true' || (github.ref_name != 'master' && github.ref_name != 'main') }}
       - name: Publish Package to TestPyPI
