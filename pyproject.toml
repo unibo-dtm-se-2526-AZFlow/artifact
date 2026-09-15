@@ -3,7 +3,7 @@ name = "AZFlow"
 packages = [
     { include = "AZFlow" },
 ]
-version = "0.0.0"
+version = "0.1.0"
 description = "AZFlow, a healthcare queue management system for outpatient environments"
 authors = ["Andrea Zaccheroni <andrea.zaccheroni@studio.unibo.it>"]
 license = "Apache 2.0"

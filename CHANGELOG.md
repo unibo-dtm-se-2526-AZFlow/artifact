@@ -1,3 +1,28 @@
+## [0.1.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.0.0...v0.1.0) (2026-09-15)
+
+### Features
+
+* add application settings variables using pydantic ([c2e95fa](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/c2e95faa8a7d37c3e71537e8c5e435f4c2be7bcc))
+* add health API route ([53cde95](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/53cde9573075f17108064f268cc03d43e90f1792))
+* run FastAPI application ([0c3f4a1](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/0c3f4a17d01285ca7151c3e7c30212fea0e65666))
+
+### Bug Fixes
+
+* **ci:** align Poetry version ([8f06eb8](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/8f06eb8eebb79f797600c62336efbd024b87e9a5))
+* **ci:** fix release workflow ([55a9017](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/55a901778c0981bc551908fb35e8156d9ba2fdce))
+* **ci:** update supported Python versions ([bd5ddef](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/bd5ddefeff08d0b1145b11aa0338f6f087600fb9))
+* complete foundation setup ([8d547ac](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/8d547acedada701969d14565bf6853589b227129))
+
+### Build and continuous integration
+
+* add Docker setup ([728df84](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/728df84f7adb336c621839785bd0cf3a5be5d747))
+
+### General maintenance
+
+* **ci:** configure TestPyPI trusted publishing ([7c48657](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/7c48657c5dd352acd7011f10082cde18d12cc37b))
+* **ci:** remove Python 3.14 from test matrix because of  CI performance reasons ([ca39300](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/ca39300e70b763a8fa0df150efef7ab6aa05f654))
+* **release:** use v prefix for version tags ([d4eb6d4](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/d4eb6d40f673181afa2ce516961158fa83ffc967))
+
 ## [2.4.1](https://github.com/aequitas-aod/template-python-project-poetry/compare/2.4.0...2.4.1) (2025-12-19)
 
 ### Dependency updates
