@@ -4,6 +4,8 @@ let prepareCmd = "poetry version -- \\${nextRelease.version} && poetry build";
 
 import config from 'semantic-release-preconfigured-conventional-commits' with {type: 'json'};
 
+config.tagFormat = "v${version}";
+
 config.plugins.push(
     ["@semantic-release/exec", {
         "prepareCmd" : prepareCmd,
