@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
-  id-token: write
 jobs:
   release:
     name: Release
@@ -12,7 +11,6 @@ jobs:
       # Only one release job at a time. Strictly sequential.
       group: deploy
     runs-on: ubuntu-latest
-    environment: testpypi
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
@@ -61,11 +59,9 @@ jobs:
           npm install
           npx semantic-release
         env:
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_TEST_PYPI: true
           # dry run if not on main/master branch, or if initial commit
           RELEASE_DRY_RUN: ${{ steps.skip_release.outputs.skip == 'true' || (github.ref_name != 'master' && github.ref_name != 'main') }}
-      - name: Publish Package to TestPyPI
-        if: github.ref_name == 'master' && hashFiles('dist/*') != ''
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
+          

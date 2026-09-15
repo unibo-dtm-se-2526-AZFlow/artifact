@@ -99,7 +99,6 @@ jobs:
     name: Deploy
     permissions: 
       contents: write
-      id-token: write
     needs:
       - test
     uses: ./.github/workflows/deploy.yml
