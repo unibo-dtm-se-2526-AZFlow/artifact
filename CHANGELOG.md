@@ -1,3 +1,9 @@
+## [0.1.2](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.1.1...v0.1.2) (2026-09-15)
+
+### Bug Fixes
+
+* **ci:** return to the original professor's template release setup... ([392b034](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/392b0344068ed6eb5ab5c2b25bebdaf664487139))
+
 ## [0.1.1](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.1.0...v0.1.1) (2026-09-15)
 
 ### Bug Fixes
