@@ -3,7 +3,7 @@ name = "AZFlow"
 packages = [
     { include = "AZFlow" },
 ]
-version = "2.4.1"
+version = "0.0.0"
 description = "AZFlow, a healthcare queue management system for outpatient environments"
 authors = ["Andrea Zaccheroni <andrea.zaccheroni@studio.unibo.it>"]
 license = "Apache 2.0"
@@ -11,7 +11,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 # update the Python versions in .github/workflows/check.yml if you change this
-python = ">= 3.9.0 < 4.0.0"
+python = ">= 3.10.0 < 4.0.0"
 fastapi = "^0.115.0"
 uvicorn = { version = "^0.30.0", extras = ["standard"] }
 psycopg = { version = "^3.2.0", extras = ["binary"] }
