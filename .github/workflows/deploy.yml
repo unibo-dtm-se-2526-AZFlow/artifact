@@ -12,6 +12,7 @@ jobs:
       # Only one release job at a time. Strictly sequential.
       group: deploy
     runs-on: ubuntu-latest
+    environment: testpypi
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
