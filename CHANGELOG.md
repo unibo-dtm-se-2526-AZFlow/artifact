@@ -1,3 +1,9 @@
+## [0.1.1](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.1.0...v0.1.1) (2026-09-15)
+
+### Bug Fixes
+
+* **ci:** configure TestPyPI environment ([bed7fe7](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/bed7fe721913894e81efe23689a49c4412b079e9))
+
 ## [0.1.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.0.0...v0.1.0) (2026-09-15)
 
 ### Features
