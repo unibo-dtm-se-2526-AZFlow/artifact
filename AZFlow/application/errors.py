@@ -1,12 +1,10 @@
-"""Application-level errors for the Patient Check-In use case.
+"""Application errors for Patient Check-In
 
-These are use-case errors raised by the application layer. They are kept
-small and explicit, and they must not depend on FastAPI, psycopg or any
-delivery/infrastructure framework. The API adapter maps them to HTTP 4xx
-responses; the domain does not depend on them.
+These errors describe problems found while running the use case. They do not
+depend on FastAPI, the database or other external tools.
 
-Patient identifiers must not be included in these messages, so they can be
-surfaced in public error output and routine logs without leaking identity.
+They only keep the data needed by the API. User-facing messages belong to the
+API layer.
 """
 
 from __future__ import annotations
@@ -17,16 +15,12 @@ class ApplicationError(Exception):
 
 
 class UnsupportedIdentifierTypeError(ApplicationError):
-    """Raised when the presented PatientIdentifier type is not supported.
-
-    The current slice supports only ``fiscal_code``. The message names the
-    unsupported type but never the identifier value.
-    """
+    """Raised when the identifier type is not supported"""
 
     def __init__(self, identifier_type: str) -> None:
         self.identifier_type = identifier_type
-        super().__init__(f"unsupported patient identifier type: {identifier_type!r}")
+        super().__init__()
 
 
 class NoAppointmentAvailableError(ApplicationError):
-    """Raised when no relevant appointment is available for check-in"""
+    """Raised when no appointment is available for check-in"""
