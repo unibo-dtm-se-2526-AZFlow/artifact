@@ -21,6 +21,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./AZFlow/infrastructure/persistence/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+      - ./AZFlow/infrastructure/persistence/seed_data.sql:/docker-entrypoint-initdb.d/seed_data.sql:ro
 
 volumes:
   pgdata:
