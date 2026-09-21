@@ -4,12 +4,15 @@ These run against a real database and are skipped when no DSN is provided
 (see conftest). They verify: agenda resolution and lowest-id ACTIVE Queue
 ordering, atomic sequential code allocation, the DailyPresence unique
 constraint with reload-on-conflict, Appointment recognition/reuse,
-ServiceAccess non-duplication, and concurrent DailyPresence creation.
+ServiceAccess non-duplication, and concurrent DailyPresence and
+concurrent ServiceAccess creation.
 """
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
+from threading import Barrier
 
 import psycopg
 import pytest
@@ -358,3 +361,41 @@ def test_disabled_source_appointment_is_ignored_before_operational_creation(
         assert cursor.fetchone()[0] == 0
         cursor.execute("SELECT count(*) FROM service_access")
         assert cursor.fetchone()[0] == 0
+
+
+def test_concurrent_service_access_creation_reuses_one_access(connection, dsn):
+    source = seed_source(connection)
+    external_agenda = seed_external_agenda(connection, source, "Cardiology", "AGENDA-A")
+    ticket_master = seed_ticket_master(connection, "AAA")
+
+    setup_repository = PostgresCheckInRepository(connection)
+    presence = setup_repository.create_daily_presence_with_code(
+        IDENTIFIER, OPERATIONAL_DAY, ticket_master
+    )
+    appointment = setup_repository.find_or_create_appointment(
+        _appointment_data("MOCK-APPT-CONCURRENT"), IDENTIFIER, external_agenda
+    )
+
+    barrier = Barrier(2)
+
+    def create_service_access() -> int:
+        with psycopg.connect(dsn) as worker_connection:
+            worker_repository = PostgresCheckInRepository(worker_connection)
+            barrier.wait(timeout=10)
+            service_access = worker_repository.find_or_create_service_access(
+                presence, external_agenda.agenda, appointment
+            )
+            return service_access.id
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(create_service_access),
+            executor.submit(create_service_access),
+        ]
+        service_access_ids = [future.result() for future in futures]
+
+    assert service_access_ids[0] == service_access_ids[1]
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT count(*) FROM service_access")
+        assert cursor.fetchone()[0] == 1

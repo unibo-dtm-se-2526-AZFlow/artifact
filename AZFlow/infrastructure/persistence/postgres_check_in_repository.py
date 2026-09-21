@@ -279,32 +279,40 @@ class PostgresCheckInRepository:
             with self._conn.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT id
-                    FROM service_access
-                    WHERE daily_presence_id = %s AND appointment_id = %s
+                    INSERT INTO service_access (
+                        daily_presence_id, agenda_id, appointment_id, state
+                    )
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (daily_presence_id, appointment_id)
+                        WHERE appointment_id IS NOT NULL
+                    DO NOTHING
+                    RETURNING id
                     """,
-                    (daily_presence.id, appointment.id),
+                    (
+                        daily_presence.id,
+                        agenda.id,
+                        appointment.id,
+                        ServiceAccessState.WAITING.value,
+                    ),
                 )
-                existing = cursor.fetchone()
-                if existing is not None:
-                    service_access_id = existing[0]
+                inserted = cursor.fetchone()
+                if inserted is not None:
+                    service_access_id = inserted[0]
                 else:
                     cursor.execute(
                         """
-                        INSERT INTO service_access (
-                            daily_presence_id, agenda_id, appointment_id, state
-                        )
-                        VALUES (%s, %s, %s, %s)
-                        RETURNING id
+                        SELECT id
+                        FROM service_access
+                        WHERE daily_presence_id = %s AND appointment_id = %s
                         """,
-                        (
-                            daily_presence.id,
-                            agenda.id,
-                            appointment.id,
-                            ServiceAccessState.WAITING.value,
-                        ),
+                        (daily_presence.id, appointment.id),
                     )
-                    service_access_id = self._require_returned_id(cursor.fetchone())
+                    existing = cursor.fetchone()
+                    if existing is None:
+                        raise RuntimeError(
+                            "ServiceAccess was neither inserted nor found"
+                        )
+                    service_access_id = existing[0]
             self._conn.commit()
         except Exception:
             self._conn.rollback()
