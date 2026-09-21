@@ -12,12 +12,10 @@ FISCAL_CODE = "fiscal_code"
 
 @dataclass(frozen=True)
 class PatientIdentifier:
-    """Typed identifier presented at check-in.
+    """Identifier presented by the patient at check-in
 
-    It is the identifier presented at check-in and is not a persistent
-    Patient entity. In the current slice the only supported type is
-    ``fiscal_code``, but the value object only enforces a non-empty value
-    and exposes the type; the service/API layer decides type rejection.
+    It is not a persistent Patient entity. This object only checks that the
+    value is not empty. The application layer decides which types are supported.
     """
 
     type: str
@@ -25,6 +23,4 @@ class PatientIdentifier:
 
     def __post_init__(self) -> None:
         if not self.value:
-            raise EmptyIdentifierValueError(
-                "patient identifier value must not be empty"
-            )
+            raise EmptyIdentifierValueError()

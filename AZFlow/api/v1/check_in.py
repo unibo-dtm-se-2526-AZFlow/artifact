@@ -63,7 +63,7 @@ def check_in(
     except EmptyIdentifierValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(error),
+            detail="patient identifier value must not be empty",
         ) from error
 
     try:
