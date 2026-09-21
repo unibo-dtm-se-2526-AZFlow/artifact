@@ -58,7 +58,9 @@ class PostgresCheckInRepository:
                 FROM external_agenda ea
                 JOIN agenda a ON a.id = ea.agenda_id
                 JOIN external_source es ON es.id = ea.external_source_id
-                WHERE es.code = %s AND ea.external_reference = %s
+                WHERE es.code = %s
+                  AND ea.external_reference = %s
+                  AND es.enabled = TRUE
                 """,
                 (external_source_code, external_agenda_reference),
             )

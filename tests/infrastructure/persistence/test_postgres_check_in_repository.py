@@ -12,8 +12,12 @@ from __future__ import annotations
 from datetime import date, datetime
 
 import psycopg
+import pytest
 
+from AZFlow.application.check_in import CheckInService
+from AZFlow.application.errors import NoServiceAvailableError
 from AZFlow.application.ports.appointment_source import ExternalAppointmentData
+from AZFlow.infrastructure.appointment_sources.mock import MockAppointmentSource
 from AZFlow.domain.patient_identifier import FISCAL_CODE, PatientIdentifier
 from AZFlow.infrastructure.persistence.postgres_check_in_repository import (
     PostgresCheckInRepository,
@@ -319,3 +323,38 @@ def test_repeated_same_day_check_in_reuses_presence_code_and_service_access(
         assert cursor.fetchone()[0] == 1
         cursor.execute("SELECT count(*) FROM service_access")
         assert cursor.fetchone()[0] == 1
+
+
+def test_disabled_source_appointment_is_ignored_before_operational_creation(
+    connection,
+):
+    source = seed_source(connection)
+    external_agenda = seed_external_agenda(connection, source, "Cardiology", "AGENDA-A")
+    ticket_master = seed_ticket_master(connection, "AAA")
+    seed_queue(connection, ticket_master, [external_agenda.agenda.id], status="ACTIVE")
+
+    # Disable the configured source after all relevant configuration exists and
+    # before the check-in performs its repository relevance lookup.
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "UPDATE external_source SET enabled = FALSE WHERE id = %s",
+            (source.id,),
+        )
+    connection.commit()
+
+    appointment_source = MockAppointmentSource(
+        {IDENTIFIER.value: [_appointment_data("MOCK-APPT-DISABLED")]}
+    )
+    repository = PostgresCheckInRepository(connection)
+    service = CheckInService([appointment_source], repository)
+
+    with pytest.raises(NoServiceAvailableError):
+        service.check_in(IDENTIFIER, OPERATIONAL_DAY)
+
+    assert repository.resolve_agenda("MOCK", "AGENDA-A") is None
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT count(*) FROM daily_presence")
+        assert cursor.fetchone()[0] == 0
+        cursor.execute("SELECT count(*) FROM service_access")
+        assert cursor.fetchone()[0] == 0
