@@ -16,8 +16,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-azflow}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-azflow}
       POSTGRES_DB: ${POSTGRES_DB:-azflow}
+    ports:
+      - "${AZFLOW_DB_HOST_PORT:-55432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./AZFlow/infrastructure/persistence/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
 
 volumes:
   pgdata:
