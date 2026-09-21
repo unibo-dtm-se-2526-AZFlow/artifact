@@ -1,3 +1,36 @@
+## [0.2.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.1.2...v0.2.0) (2026-09-21)
+
+### Features
+
+* **api:** add patient check-in endpoint ([cc56a42](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/cc56a4248daa395ef1e2c0fda6c8e88f12198786))
+* **application:** add appointment source port ([438ce9c](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/438ce9c8e964cb1eaada012e50f16ab9cfbda32e))
+* **application:** add check-in repository port ([7455ea8](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/7455ea84be316cdbdb020f3cc036a0574e97b3f7))
+* **application:** add patient check-in service ([abe4213](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/abe4213a63d0424c576563761229f9b422cdbf1e))
+* **composition:** wire patient check-in ([c27b2b6](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/c27b2b6f1f65abe72e57eb635db39f8fbbf759b2))
+* **domain:** add patient check-in model ([9b7ad04](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/9b7ad04c50d32093068d609e96f2d1e39bb2f657))
+* **infrastructure:** add mock appointment source ([750d562](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/750d562d516f0df67393c0b237e3a15d246a9bb4))
+* **persistence:** add patient check-in schema ([078036e](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/078036e9bf2cac973acfc27addc305b84b359a01))
+* **persistence:** add PostgreSQL check-in repository ([a02c689](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/a02c68982dcd6af9330c0bae52508f1577de383a))
+
+### Bug Fixes
+
+* **check-in:** clarify no appointments response ([4edbf8c](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/4edbf8c08ebf459fdaa7161f3fddba7c2238a8f7))
+* **check-in:** ignore disabled appointment sources ([709aab0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/709aab0a0764c60d9a8f0d86b95a072be9f6c3ad))
+* **persistence:** handle concurrent service access creation ([276769e](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/276769e424597cf27d0a5af6a2a0fdd23f3f3601))
+
+### Tests
+
+* **api:** cover patient check-in endpoint ([93651d5](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/93651d5c50081c399eb49900c630893dd6cb2ae0))
+* **application:** cover patient check-in service ([58609d5](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/58609d53ca2392a16e82d8c2dfd3fe60f7df45b2))
+* **domain:** cover patient check-in model ([8f1f4cc](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/8f1f4cce2dd0426b493c4628d4e95b8a6e42c0f8))
+* **infrastructure:** cover mock appointment source ([6d16700](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/6d167008a36edf5f875f2406eb93e4a0dd893a00))
+* **persistence:** cover check-in repository ([c142034](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/c1420342d474ccaf7f6002dbe9b212f7c43aace0))
+
+### Refactoring
+
+* **application:** keep user messages in API ([ca8b6ab](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/ca8b6ab0fbbe29a9acffe12c43c4e77d18d5ec8c))
+* **domain:** keep HTTP messages in API ([8502f29](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/8502f2929b13c1db0d14add8d76f385555f4d1b0))
+
 ## [0.1.2](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.1.1...v0.1.2) (2026-09-15)
 
 ### Bug Fixes
