@@ -11,7 +11,7 @@ from datetime import date
 from typing import List, Optional, Sequence, Tuple
 
 from AZFlow.application.errors import (
-    NoServiceAvailableError,
+    NoAppointmentAvailableError,
     UnsupportedIdentifierTypeError,
 )
 from AZFlow.application.ports.appointment_source import (
@@ -70,7 +70,7 @@ class CheckInService:
 
         Raises:
             UnsupportedIdentifierTypeError: the identifier type is not supported
-            NoServiceAvailableError: no valid appointment is available
+            NoAppointmentAvailableError: no valid appointment is available
         """
         self._require_supported_type(patient_identifier)
 
@@ -79,7 +79,7 @@ class CheckInService:
         relevant = self._collect_relevant(patient_identifier, day)
         if not relevant:
             # Stop before creating check-in data
-            raise NoServiceAvailableError()
+            raise NoAppointmentAvailableError()
 
         # Save appointments first because their ids are used to resolve ties
         imported = [

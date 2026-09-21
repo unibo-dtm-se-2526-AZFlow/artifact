@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from AZFlow.application.check_in import CheckInService
 from AZFlow.application.errors import (
-    NoServiceAvailableError,
+    NoAppointmentAvailableError,
     UnsupportedIdentifierTypeError,
 )
 from AZFlow.domain.errors import EmptyIdentifierValueError
@@ -74,10 +74,10 @@ def check_in(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(f"unsupported patient identifier type: {error.identifier_type!r}"),
         ) from error
-    except NoServiceAvailableError as error:
+    except NoAppointmentAvailableError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="no service available for check-in",
+            detail="no appointments found for check-in",
         ) from error
 
     return CheckInResponse(public_call_code=result.public_call_code)

@@ -5,7 +5,7 @@ import pytest
 
 from AZFlow.application.check_in import CheckInService
 from AZFlow.application.errors import (
-    NoServiceAvailableError,
+    NoAppointmentAvailableError,
     UnsupportedIdentifierTypeError,
 )
 from AZFlow.application.ports.appointment_source import ExternalAppointmentData
@@ -92,10 +92,10 @@ def test_successful_check_in_returns_code_and_creates_service_accesses():
     )
 
 
-def test_no_appointments_raises_no_service_and_creates_nothing():
+def test_no_appointments_raises_no_appointment_error_and_creates_nothing():
     service, repository = _service({}, [])
 
-    with pytest.raises(NoServiceAvailableError):
+    with pytest.raises(NoAppointmentAvailableError):
         service.check_in(_IDENTIFIER, _DAY)
 
     assert repository.created_daily_presences == 0
@@ -113,7 +113,7 @@ def test_unknown_agenda_and_no_active_queue_are_filtered_out():
     ]
     service, repository = _service(resolutions, appointments)
 
-    with pytest.raises(NoServiceAvailableError):
+    with pytest.raises(NoAppointmentAvailableError):
         service.check_in(_IDENTIFIER, _DAY)
 
     assert repository.created_daily_presences == 0

@@ -182,7 +182,7 @@ def test_missing_identifier_value_returns_4xx(client):
     assert 400 <= response.status_code < 500
 
 
-def test_no_relevant_service_returns_4xx_indicating_no_service(client):
+def test_no_relevant_appointment_returns_4xx_indicating_no_appointment(client):
     _override(_service_without_appointment())
 
     response = client.post(
@@ -191,7 +191,7 @@ def test_no_relevant_service_returns_4xx_indicating_no_service(client):
     )
 
     assert 400 <= response.status_code < 500
-    assert "no service" in response.json()["detail"]
+    assert response.json()["detail"] == "no appointments found for check-in"
 
 
 def test_success_path_creates_two_service_accesses_sharing_one_code(client):

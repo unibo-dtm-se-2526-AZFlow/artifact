@@ -28,13 +28,5 @@ class UnsupportedIdentifierTypeError(ApplicationError):
         super().__init__(f"unsupported patient identifier type: {identifier_type!r}")
 
 
-class NoServiceAvailableError(ApplicationError):
-    """Raised when no relevant service is available for check-in.
-
-    This happens when no appointment source returns an Appointment, or when
-    every returned Appointment is ignored because its Agenda is unknown or has
-    no ACTIVE Queue. No DailyPresence or ServiceAccess is created in this case.
-    """
-
-    def __init__(self) -> None:
-        super().__init__("no relevant service is available for check-in")
+class NoAppointmentAvailableError(ApplicationError):
+    """Raised when no relevant appointment is available for check-in"""

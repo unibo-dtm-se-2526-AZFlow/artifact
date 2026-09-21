@@ -18,7 +18,7 @@ import psycopg
 import pytest
 
 from AZFlow.application.check_in import CheckInService
-from AZFlow.application.errors import NoServiceAvailableError
+from AZFlow.application.errors import NoAppointmentAvailableError
 from AZFlow.application.ports.appointment_source import ExternalAppointmentData
 from AZFlow.infrastructure.appointment_sources.mock import MockAppointmentSource
 from AZFlow.domain.patient_identifier import FISCAL_CODE, PatientIdentifier
@@ -351,7 +351,7 @@ def test_disabled_source_appointment_is_ignored_before_operational_creation(
     repository = PostgresCheckInRepository(connection)
     service = CheckInService([appointment_source], repository)
 
-    with pytest.raises(NoServiceAvailableError):
+    with pytest.raises(NoAppointmentAvailableError):
         service.check_in(IDENTIFIER, OPERATIONAL_DAY)
 
     assert repository.resolve_agenda("MOCK", "AGENDA-A") is None
