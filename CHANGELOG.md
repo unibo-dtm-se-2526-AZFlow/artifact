@@ -1,3 +1,37 @@
+## [0.4.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.3.0...v0.4.0) (2026-09-22)
+
+### Features
+
+* **api:** add patient calling endpoints ([f859767](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/f8597677bbd3e0014669e6b380844bca892dc371))
+* **api:** wire patient calling ([d98c85d](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/d98c85d19b3af1e94dea8d8b23fe93b60d790b6e))
+* **application:** add calling errors ([f054ddf](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/f054ddfa6ea896a54c38953e87734003713caa19))
+* **application:** add calling ports ([f9dc401](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/f9dc401788d1e36a2dc4d74b3014e12773860bc1))
+* **application:** add patient calling ([cd88107](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/cd881074a01a145d8ec86bfdc8d2ab9245ed9f89))
+* **domain:** add CALLED state and call transition ([db83b12](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/db83b12ada0dfd72769a9e31fe66bcfda80140a1))
+* **events:** add in-process call event publisher ([58af4da](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/58af4dac142fa42b09b0052e296be44b3a6fe049))
+* **persistence:** add call repository ([5809462](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/58094622302972265dac0c434253bafa89ca0163))
+* **persistence:** allow CALLED service access state ([ee7a74c](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/ee7a74c9c18045215228a7e5a1cf8d25e3c3d26a))
+
+### Documentation
+
+* add AZFlow project README ([463bf8f](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/463bf8f43ddcfc64b7a82ac7cca7a7214df9d46a))
+
+### Tests
+
+* **patient-calling:** cover call repository ([a84b046](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/a84b046e3a17bd528f417db3220bf662ca6b49f0))
+* **patient-calling:** cover calling api ([827b6f2](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/827b6f254ebd465f54d97b98d18615b1d7e1f04e))
+* **patient-calling:** cover calling service ([e7ee3fa](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/e7ee3faee6dbf58f45271f0aad39d6aaf1bd89b2))
+* **patient-calling:** cover patient calling end to end ([3c5f4a6](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/3c5f4a6680782bc9babf04345d1cafea94f20b00))
+
+### General maintenance
+
+* **dev:** add manual demo scenario ([1f766bc](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/1f766bccd0da2431d81bdd35e4b4055c0ec93c69))
+
+### Refactoring
+
+* **application:** drop unused CallRepository.load_queue ([d59ab75](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/d59ab75cbb95f9128edf25151dfd346f738ff7c3))
+* **application:** share queue ordering ([a90caa8](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/a90caa82be0a06bdbda3a357f84e0142e0175719))
+
 ## [0.3.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.2.0...v0.3.0) (2026-09-22)
 
 ### Features
