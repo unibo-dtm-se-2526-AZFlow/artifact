@@ -8,20 +8,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from AZFlow.application.errors import (
     MissingPublicCallCodeError,
     QueueInactiveError,
     QueueNotFoundError,
 )
+from AZFlow.application.ordering import callable_ordered
 from AZFlow.application.ports.queue_view_reader import (
     CandidateServiceAccess,
     QueueViewReader,
 )
 from AZFlow.domain.agenda import Agenda
 from AZFlow.domain.queue import QueuePolicy
-from AZFlow.domain.service_access import ServiceAccessState
 
 
 @dataclass(frozen=True)
@@ -74,51 +74,10 @@ class QueueViewService:
         served_agenda_ids = [agenda.id for agenda in queue.agendas]
         candidates = self._reader.list_service_accesses(served_agenda_ids, day)
 
-        kept = self._filter_candidates(candidates, served_agenda_ids)
-        ordered = self._order(kept, queue.policy)
+        ordered = callable_ordered(candidates, served_agenda_ids, queue.policy)
         entries = [self._to_entry(candidate) for candidate in ordered]
 
         return QueueView(queue_id=queue_id, policy=queue.policy, entries=entries)
-
-    @staticmethod
-    def _filter_candidates(
-        candidates: List[CandidateServiceAccess],
-        served_agenda_ids: List[int],
-    ) -> List[CandidateServiceAccess]:
-        """Keep served, WAITING candidates without duplicates."""
-        served = set(served_agenda_ids)
-        seen: Dict[int, CandidateServiceAccess] = {}
-        for candidate in candidates:
-            if candidate.agenda.id not in served:
-                continue
-            if candidate.state is not ServiceAccessState.WAITING:
-                continue
-            if candidate.service_access_id not in seen:
-                seen[candidate.service_access_id] = candidate
-        return list(seen.values())
-
-    @staticmethod
-    def _order(
-        candidates: List[CandidateServiceAccess],
-        policy: QueuePolicy,
-    ) -> List[CandidateServiceAccess]:
-        """Order the candidates by the Queue policy."""
-        if policy is QueuePolicy.BY_APPOINTMENT:
-            with_appointment = sorted(
-                (c for c in candidates if c.scheduled_at is not None),
-                key=lambda c: (c.scheduled_at, c.service_access_id),
-            )
-            without_appointment = sorted(
-                (c for c in candidates if c.scheduled_at is None),
-                key=lambda c: c.service_access_id,
-            )
-            return with_appointment + without_appointment
-
-        # BY_ARRIVAL: composite arrival proxy.
-        return sorted(
-            candidates,
-            key=lambda c: (c.daily_presence_id, c.service_access_id),
-        )
 
     @staticmethod
     def _to_entry(candidate: CandidateServiceAccess) -> QueueViewEntry:
