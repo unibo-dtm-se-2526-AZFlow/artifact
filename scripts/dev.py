@@ -102,21 +102,39 @@ def wait_for_postgres() -> None:
     sys.exit(1)
 
 
+def ensure_database(name: str) -> None:
+    """Create a local PostgreSQL database when it does not exist."""
+    import psycopg
+    from psycopg import sql
+
+    admin_url = database_url("postgres")
+
+    with psycopg.connect(admin_url, autocommit=True) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (name,))
+            if cursor.fetchone() is not None:
+                return
+            cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+
+
+def database_url(name: str | None = None) -> str:
+    """Build a local PostgreSQL URL from the development configuration."""
+    config = compose_environment()
+    user = quote(config["POSTGRES_USER"], safe="")
+    password = quote(config["POSTGRES_PASSWORD"], safe="")
+    database = quote(name or config["POSTGRES_DB"], safe="")
+    port = config["AZFLOW_DB_HOST_PORT"]
+    return f"postgresql://{user}:{password}@localhost:{port}/{database}"
+
+
 def run_azflow() -> None:
     """Run AZFlow locally with Uvicorn auto-reload in the current venv."""
     config = compose_environment()
     host = config["AZFLOW_API_HOST"]
     port = config["AZFLOW_API_PORT"]
 
-    user = quote(config["POSTGRES_USER"], safe="")
-    password = quote(config["POSTGRES_PASSWORD"], safe="")
-    database = quote(config["POSTGRES_DB"], safe="")
-    db_port = config["AZFLOW_DB_HOST_PORT"]
-
     process_environment = os.environ.copy()
-    process_environment["AZFLOW_DATABASE_URL"] = (
-        f"postgresql://{user}:{password}@localhost:{db_port}/{database}"
-    )
+    process_environment["AZFLOW_DATABASE_URL"] = database_url()
 
     command = [
         sys.executable,
