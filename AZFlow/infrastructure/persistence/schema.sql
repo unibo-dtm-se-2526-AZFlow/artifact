@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS service_access (
     daily_presence_id INTEGER NOT NULL REFERENCES daily_presence (id),
     agenda_id         INTEGER NOT NULL REFERENCES agenda (id),
     appointment_id    INTEGER REFERENCES appointment (id),
-    state             TEXT NOT NULL DEFAULT 'WAITING' CHECK (state IN ('WAITING'))
+    state             TEXT NOT NULL DEFAULT 'WAITING' CHECK (state IN ('WAITING', 'CALLED'))
 );
 
 -- Prevent duplicate accesses for the same presence and appointment
