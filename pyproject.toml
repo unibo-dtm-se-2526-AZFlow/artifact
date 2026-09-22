@@ -41,6 +41,8 @@ static-checks = [
     "ruff-check",
     "mypy",
 ]
+dev = "python scripts/dev.py"
+dev-reset = "python scripts/dev.py reset"
 
 [build-system]
 requires = ["poetry-core"]
