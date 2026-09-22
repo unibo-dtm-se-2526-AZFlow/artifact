@@ -84,8 +84,16 @@ def wait_for_postgres() -> None:
     deadline = time.monotonic() + READINESS_TIMEOUT_SECONDS
     while time.monotonic() < deadline:
         result = compose(
-            "exec", "-T", "postgres", "pg_isready", "-U", user, "-d", database,
-            check=False, capture_output=True,
+            "exec",
+            "-T",
+            "postgres",
+            "pg_isready",
+            "-U",
+            user,
+            "-d",
+            database,
+            check=False,
+            capture_output=True,
         )
         if result.returncode == 0:
             print("PostgreSQL is ready.")
