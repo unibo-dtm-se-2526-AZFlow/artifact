@@ -44,3 +44,31 @@ class MissingPublicCallCodeError(ApplicationError):
     def __init__(self, service_access_id: int) -> None:
         self.service_access_id = service_access_id
         super().__init__()
+
+
+class MissingRoomReferenceError(ApplicationError):
+    """Raised when the required Room reference is missing, empty or blank."""
+
+
+class NoPatientToCallError(ApplicationError):
+    """Raised when call next finds no callable ServiceAccess for the day."""
+
+    def __init__(self, queue_id: int) -> None:
+        self.queue_id = queue_id
+        super().__init__()
+
+
+class ServiceAccessNotVisibleError(ApplicationError):
+    """Raised when the target ServiceAccess is not visible through the Queue."""
+
+    def __init__(self, service_access_id: int) -> None:
+        self.service_access_id = service_access_id
+        super().__init__()
+
+
+class ServiceAccessNotCallableError(ApplicationError):
+    """Raised when the target ServiceAccess is visible but not WAITING."""
+
+    def __init__(self, service_access_id: int) -> None:
+        self.service_access_id = service_access_id
+        super().__init__()
