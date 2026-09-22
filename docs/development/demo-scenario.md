@@ -55,10 +55,44 @@ curl -s http://localhost:8000/api/v1/queues/3/service-accesses
 Queue 1 should reflect arrival order. Queues 2 and 3 should reflect appointment order for their respective Agendas.
 
 DEV0006 is useful for checking that one DailyPresence can create ServiceAccesses for more than one Agenda while reusing the same public call code.
+
+## Patient calling
+
+Call the next Patient from Queue 1 and send the call to a Room:
+
+~~~bash
+curl -s -X POST http://localhost:8000/api/v1/queues/1/calls/next \
+  -H 'Content-Type: application/json' \
+  -d '{"room_reference":"ROOM-1"}'
+~~~
+
+The response should contain the public call code, the selected ServiceAccess, its Agenda, `state: "CALLED"`, and the same Room reference. It must not contain Patient-identifying data.
+
+View Queue 1 again:
+
+~~~bash
+curl -s http://localhost:8000/api/v1/queues/1/service-accesses
+~~~
+
+The called ServiceAccess is no longer part of the WAITING Queue view. If its Agenda is shared with another Queue, it disappears there too because both Queues refer to the same ServiceAccess.
+
+To call a specific Patient, first choose a `service_access_id` from one of the Queue responses, then run:
+
+~~~bash
+SERVICE_ACCESS_ID=<id>
+
+curl -s -X POST \
+  "http://localhost:8000/api/v1/queues/1/service-accesses/$SERVICE_ACCESS_ID/call" \
+  -H 'Content-Type: application/json' \
+  -d '{"room_reference":"ROOM-2"}'
+~~~
+
+The selected ServiceAccess must be visible and WAITING in Queue 1. Calling an already called ServiceAccess returns a conflict instead of calling it again.
+
 ## Extending the scenario
 
 Keep this dataset small and deterministic.
 
-When a new operational feature is added, extend this document with the minimum manual steps needed to exercise it. Patient Calling can add Call Next and Call Specific examples here once their HTTP endpoints are implemented.
+When a new operational feature is added, extend this document with the minimum manual steps needed to exercise it.
 
 The demo data belongs to the development adapter. Production integrations must not depend on these identifiers or appointments.
