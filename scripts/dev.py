@@ -13,6 +13,8 @@ import time
 from pathlib import Path
 from urllib.parse import quote
 
+import uvicorn
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 READINESS_TIMEOUT_SECONDS = 60
@@ -54,14 +56,22 @@ def compose_environment() -> dict[str, str]:
     return environment
 
 
+def compose(
+    *args: str, check: bool = True, capture_output: bool = False
+) -> subprocess.CompletedProcess[bytes]:
+    """Run a Docker Compose command from the repository root."""
+    return subprocess.run(
+        ["docker", "compose", *args],
+        cwd=REPO_ROOT,
+        check=check,
+        capture_output=capture_output,
+    )
+
+
 def start_postgres() -> None:
     """Start the Docker Compose ``postgres`` service in detached mode."""
     print("Starting PostgreSQL via Docker Compose...")
-    subprocess.run(
-        ["docker", "compose", "up", "-d", "postgres"],
-        cwd=REPO_ROOT,
-        check=True,
-    )
+    compose("up", "-d", "postgres")
 
 
 def wait_for_postgres() -> None:
@@ -73,21 +83,9 @@ def wait_for_postgres() -> None:
     print("Waiting for PostgreSQL to become ready...")
     deadline = time.monotonic() + READINESS_TIMEOUT_SECONDS
     while time.monotonic() < deadline:
-        result = subprocess.run(
-            [
-                "docker",
-                "compose",
-                "exec",
-                "-T",
-                "postgres",
-                "pg_isready",
-                "-U",
-                user,
-                "-d",
-                database,
-            ],
-            cwd=REPO_ROOT,
-            capture_output=True,
+        result = compose(
+            "exec", "-T", "postgres", "pg_isready", "-U", user, "-d", database,
+            check=False, capture_output=True,
         )
         if result.returncode == 0:
             print("PostgreSQL is ready.")
@@ -128,68 +126,34 @@ def database_url(name: str | None = None) -> str:
 
 
 def run_azflow() -> None:
-    """Run AZFlow locally with Uvicorn auto-reload in the current venv."""
+    """Run AZFlow locally with Uvicorn auto-reload."""
     config = compose_environment()
-    host = config["AZFLOW_API_HOST"]
-    port = config["AZFLOW_API_PORT"]
+    os.environ["AZFLOW_DATABASE_URL"] = database_url()
 
-    process_environment = os.environ.copy()
-    process_environment["AZFLOW_DATABASE_URL"] = database_url()
-
-    command = [
-        sys.executable,
-        "-m",
-        "uvicorn",
-        "AZFlow.api:app",
-        "--reload",
-        "--host",
-        host,
-        "--port",
-        port,
-    ]
-
-    print(f"Starting AZFlow on {host}:{port} with auto-reload...")
-    process = subprocess.Popen(
-        command,
-        cwd=REPO_ROOT,
-        env=process_environment,
+    print(
+        f"Starting AZFlow on {config['AZFLOW_API_HOST']}:{config['AZFLOW_API_PORT']}..."
     )
-    try:
-        process.wait()
-    except KeyboardInterrupt:
-        print("\nStopping AZFlow...")
-        _terminate(process)
-
-
-def _terminate(process: subprocess.Popen[bytes]) -> None:
-    """Terminate a subprocess cleanly, escalating to kill if needed."""
-    process.terminate()
-    try:
-        process.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
+    uvicorn.run(
+        "AZFlow.api:app",
+        host=config["AZFLOW_API_HOST"],
+        port=int(config["AZFLOW_API_PORT"]),
+        reload=True,
+    )
 
 
 def _confirm(prompt: str) -> bool:
-    """Ask a yes/no question on stdin with a default of No."""
+    """Ask for confirmation, defaulting to No."""
     try:
-        answer = input(prompt)
+        return input(prompt).strip().lower() in {"y", "yes"}
     except (EOFError, KeyboardInterrupt):
-        answer = ""
-
-    return answer.strip().lower().startswith("y")
+        return False
 
 
 def maybe_stop_postgres() -> None:
     """Ask whether to stop PostgreSQL; default is No."""
     if _confirm("Stop PostgreSQL too? [y/N] "):
         print("Stopping PostgreSQL...")
-        subprocess.run(
-            ["docker", "compose", "stop", "postgres"],
-            cwd=REPO_ROOT,
-            check=True,
-        )
+        compose("stop", "postgres")
     else:
         print("Leaving PostgreSQL running.")
 
@@ -205,11 +169,7 @@ def reset_database() -> None:
         return
 
     print("Stopping services and removing the development volume...")
-    subprocess.run(
-        ["docker", "compose", "down", "-v"],
-        cwd=REPO_ROOT,
-        check=True,
-    )
+    compose("down", "-v")
 
     print("Recreating PostgreSQL...")
     start_postgres()
