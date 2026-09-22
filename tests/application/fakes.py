@@ -1,19 +1,6 @@
-"""In-memory fakes honouring the check-in ports.
+"""In-memory fakes for the application ports, shared by tests.
 
-These fakes let the application service be exercised without PostgreSQL while
-respecting the port contracts:
-
-- ``resolve_agenda`` returns configured Agenda/Queue mappings or ``None``;
-- ``find_or_create_appointment`` recognizes an already imported Appointment by
-  its stable ``(external_agenda_reference, external_appointment_reference)``
-  and assigns incrementing ids otherwise;
-- ``create_daily_presence_with_code`` allocates an atomic-ish daily sequence
-  per ``(ticket_master, operational_day)`` and reloads an existing
-  DailyPresence on a duplicate ``(operational_day, identifier)``;
-- ``find_or_create_service_access`` does not duplicate for the same
-  ``(daily_presence, appointment)`` and starts in ``WAITING``.
-
-They are placed here so other application/API tests can reuse them.
+They let the application services run without PostgreSQL.
 """
 
 from __future__ import annotations
@@ -26,7 +13,9 @@ from AZFlow.application.ports.check_in_repository import (
     ResolvedAgenda,
     format_public_call_code,
 )
+from AZFlow.application.ports.queue_view_reader import CandidateServiceAccess
 from AZFlow.domain.agenda import Agenda, ExternalAgenda
+from AZFlow.domain.queue import Queue
 from AZFlow.domain.appointment import Appointment
 from AZFlow.domain.daily_presence import DailyPresence
 from AZFlow.domain.patient_identifier import PatientIdentifier
@@ -184,3 +173,66 @@ class FakeCheckInRepository:
     ) -> Tuple[str, str, str]:
         identifier_type, identifier_value = _identifier_key(patient_identifier)
         return (operational_day.isoformat(), identifier_type, identifier_value)
+
+
+class FakeQueueViewReader:
+    """In-memory QueueViewReader that filters candidates by Agenda only.
+
+    It does not filter by day. Use ``DayScopedFakeQueueViewReader`` when a test
+    needs different candidates per day.
+    """
+
+    def __init__(
+        self,
+        queues: Mapping[int, Queue],
+        candidates: Optional[List[CandidateServiceAccess]] = None,
+    ) -> None:
+        self._queues: Dict[int, Queue] = dict(queues)
+        self._candidates: List[CandidateServiceAccess] = list(candidates or [])
+        # Observability for tests.
+        self.load_queue_calls: List[int] = []
+        self.list_calls: List[Tuple[List[int], date]] = []
+
+    def load_queue(self, queue_id: int) -> Optional[Queue]:
+        self.load_queue_calls.append(queue_id)
+        return self._queues.get(queue_id)
+
+    def list_service_accesses(
+        self,
+        agenda_ids: List[int],
+        operational_day: date,
+    ) -> List[CandidateServiceAccess]:
+        self.list_calls.append((list(agenda_ids), operational_day))
+        served = set(agenda_ids)
+        return [c for c in self._candidates if c.agenda.id in served]
+
+
+class DayScopedFakeQueueViewReader:
+    """QueueViewReader fake that returns candidates for the asked-for day.
+
+    It records the day it was called with so tests can check the resolved day.
+    """
+
+    def __init__(
+        self,
+        queues: Mapping[int, Queue],
+        candidates_by_day: Mapping[date, List[CandidateServiceAccess]],
+    ) -> None:
+        self._queues: Dict[int, Queue] = dict(queues)
+        self._candidates_by_day: Dict[date, List[CandidateServiceAccess]] = {
+            day: list(items) for day, items in candidates_by_day.items()
+        }
+        self.list_calls: List[Tuple[List[int], date]] = []
+
+    def load_queue(self, queue_id: int) -> Optional[Queue]:
+        return self._queues.get(queue_id)
+
+    def list_service_accesses(
+        self,
+        agenda_ids: List[int],
+        operational_day: date,
+    ) -> List[CandidateServiceAccess]:
+        self.list_calls.append((list(agenda_ids), operational_day))
+        served = set(agenda_ids)
+        candidates = self._candidates_by_day.get(operational_day, [])
+        return [c for c in candidates if c.agenda.id in served]
