@@ -1,3 +1,34 @@
+## [0.3.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.2.0...v0.3.0) (2026-09-22)
+
+### Features
+
+* **api:** add queue view endpoint ([a63ef81](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/a63ef81f8ab4a9e59f45adc87bd37f299cd32f0a))
+* **api:** wire operator queue view ([c7c2a43](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/c7c2a43aa78a6cc9e5a1e4ebbcd0f6d363fa27b4))
+* **application:** add operator queue view ([225ee8c](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/225ee8c344b9ec5b2db0517fda02bd379d954480))
+* **application:** add queue view reader port ([2d6664d](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/2d6664d57556066898e80eaeb1f9dc9fb1bb5d7c))
+* **persistence:** add queue view reader ([5935236](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/5935236b6f0e0459e4ef564c8fe6d0b18c3b2b3b))
+
+### Tests
+
+* **queue-view:** improve queue view coverage ([93dbfc2](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/93dbfc28121364e26a6107b3160bcbf38074c9cd))
+
+### Build and continuous integration
+
+* add PostgreSQL integration tests ([4dc7e6a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/4dc7e6a4bdad3874f6ca5ef479636eae8f89cef4))
+
+### General maintenance
+
+* **dev:** add local test database support ([136170c](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/136170cec15959de96cc7a492d9b376176682325))
+* **dev:** added local development launcher ([56378e6](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/56378e6dc8d1845bed5c5c45f0eb747179ae21ba))
+
+### Style improvements
+
+* **dev:** format development launcher ([14b2bf1](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/14b2bf12ad31f437b12a2d73499c876d90dac62e))
+
+### Refactoring
+
+* **dev:** simplify local development launcher ([eb8ca2e](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/eb8ca2edf7c0d6f4a7fd51ba69da0f04b3dcfe5e))
+
 ## [0.2.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.1.2...v0.2.0) (2026-09-21)
 
 ### Features
