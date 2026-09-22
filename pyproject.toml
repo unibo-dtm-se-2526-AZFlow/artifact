@@ -27,7 +27,8 @@ ruff = "^0.15.0"
 httpx = "^0.28.1"
 
 [tool.poe.tasks]
-test = "python scripts/test.py"
+test = "pytest"
+test-integration = "python scripts/test.py"
 coverage = "coverage run -m pytest"
 coverage-report = "coverage report -m"
 coverage-html = "coverage html"
