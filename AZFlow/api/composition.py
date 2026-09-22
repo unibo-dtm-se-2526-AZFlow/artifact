@@ -11,12 +11,21 @@ from typing import Callable, Iterator
 
 from fastapi import FastAPI, HTTPException, status
 
+from AZFlow.api.v1.calling import get_calling_service
 from AZFlow.api.v1.check_in import get_check_in_service
 from AZFlow.api.v1.queue_view import get_queue_view_service
+from AZFlow.application.calling import CallingService
 from AZFlow.application.check_in import CheckInService
+from AZFlow.application.ports.call_event_publisher import CallEventPublisher
 from AZFlow.application.queue_view import QueueViewService
 from AZFlow.infrastructure.appointment_sources.mock import MockAppointmentSource
 from AZFlow.infrastructure.config import load_settings
+from AZFlow.infrastructure.events.in_process_publisher import (
+    InProcessCallEventPublisher,
+)
+from AZFlow.infrastructure.persistence.postgres_call_repository import (
+    PostgresCallRepository,
+)
 from AZFlow.infrastructure.persistence.postgres_check_in_repository import (
     PostgresCheckInRepository,
 )
@@ -97,4 +106,46 @@ def wire_queue_view(application: FastAPI) -> None:
     settings = load_settings()
     application.dependency_overrides[get_queue_view_service] = (
         build_queue_view_service_provider(settings.database_url)
+    )
+
+
+def build_calling_service_provider(
+    database_url: object,
+    publisher: CallEventPublisher,
+) -> Callable[[], Iterator[CallingService]]:
+    """Build the CallingService dependency used for each request
+
+    Each request gets a new PostgreSQL connection. The reader and the call
+    repository share that connection. The publisher is shared across requests.
+    A missing database URL returns HTTP 503.
+    """
+
+    def provide_calling_service() -> Iterator[CallingService]:
+        if not database_url:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="calling service is not configured",
+            )
+
+        # Import here so application startup does not open a connection
+        import psycopg
+
+        with psycopg.connect(str(database_url)) as connection:
+            reader = PostgresQueueViewReader(connection)
+            call_repository = PostgresCallRepository(connection)
+            yield CallingService(reader, call_repository, publisher)
+
+    return provide_calling_service
+
+
+def wire_calling(application: FastAPI) -> None:
+    """Connect the Patient Calling service to the FastAPI application
+
+    A single in-process publisher is shared across requests; it holds no
+    per-request state. Tests can replace this dependency with a fake service.
+    """
+    settings = load_settings()
+    publisher = InProcessCallEventPublisher()
+    application.dependency_overrides[get_calling_service] = (
+        build_calling_service_provider(settings.database_url, publisher)
     )
