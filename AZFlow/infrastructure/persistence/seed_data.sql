@@ -24,8 +24,9 @@ INSERT INTO ticket_master (id, prefix) VALUES
     (1, 'AAA'),
     (2, 'BBB');
 
--- Agenda A uses queue 1 because it has the lowest id
--- Agenda B uses queue 3
+-- Check-in: Agenda A uses queue 1 because it has the lowest id, Agenda B uses queue 3
+-- Queue View: Agenda A is served by queue 1 (BY_ARRIVAL) and queue 2 (BY_APPOINTMENT),
+-- so the same ServiceAccess is visible through two queues with different policies
 INSERT INTO queue (id, status, policy, ticket_master_id) VALUES
     (1, 'ACTIVE', 'BY_ARRIVAL', 1),
     (2, 'ACTIVE', 'BY_APPOINTMENT', 2),
