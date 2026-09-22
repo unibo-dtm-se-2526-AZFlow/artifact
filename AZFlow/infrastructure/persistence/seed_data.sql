@@ -24,9 +24,12 @@ INSERT INTO ticket_master (id, prefix) VALUES
     (1, 'AAA'),
     (2, 'BBB');
 
--- Check-in: Agenda A uses queue 1 because it has the lowest id, Agenda B uses queue 3
--- Queue View: Agenda A is served by queue 1 (BY_ARRIVAL) and queue 2 (BY_APPOINTMENT),
--- so the same ServiceAccess is visible through two queues with different policies
+-- Queue View: queue 1 (BY_ARRIVAL) serves both Agenda A and Agenda B,
+-- so a single queue covers more than one agenda.
+-- Agenda A is shared by queue 1 and queue 2 (BY_APPOINTMENT);
+-- Agenda B is shared by queue 1 and queue 3 (BY_APPOINTMENT),
+-- so the same ServiceAccess is visible through queues with different policies.
+-- The mock's earliest appointment is on Agenda A.
 INSERT INTO queue (id, status, policy, ticket_master_id) VALUES
     (1, 'ACTIVE', 'BY_ARRIVAL', 1),
     (2, 'ACTIVE', 'BY_APPOINTMENT', 2),
@@ -34,6 +37,7 @@ INSERT INTO queue (id, status, policy, ticket_master_id) VALUES
 
 INSERT INTO queue_agenda (queue_id, agenda_id) VALUES
     (1, 1),
+    (1, 2),
     (2, 1),
     (3, 2);
 

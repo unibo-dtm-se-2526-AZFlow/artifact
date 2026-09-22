@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
 
 import pytest
@@ -12,7 +12,10 @@ from AZFlow.domain.agenda import Agenda
 from AZFlow.domain.queue import Queue, QueuePolicy, QueueStatus
 from AZFlow.domain.service_access import ServiceAccessState
 from AZFlow.domain.ticket_master import TicketMaster
-from tests.application.fakes import FakeQueueViewReader
+from tests.application.fakes import (
+    DayScopedFakeQueueViewReader,
+    FakeQueueViewReader,
+)
 
 _TICKET_MASTER = TicketMaster(id=1, prefix="AAA")
 _AGENDA_A = Agenda(id=1, name="Cardiology")
@@ -212,6 +215,29 @@ def test_empty_view_returns_2xx_with_no_entries(client):
 
     assert response.status_code == 200
     assert response.json()["entries"] == []
+
+
+def test_queue_view_shows_only_current_operational_day(client):
+    # The route passes no day, so the service must resolve today's day and the
+    # reader must only return today's candidates end-to-end.
+    queue = _queue(1, [_AGENDA_A], QueuePolicy.BY_ARRIVAL)
+    other_day = date(2000, 1, 1)
+    reader = DayScopedFakeQueueViewReader(
+        {queue.id: queue},
+        {
+            date.today(): [_candidate(10, 1, _AGENDA_A, "AAA001")],
+            other_day: [_candidate(20, 2, _AGENDA_A, "AAA002")],
+        },
+    )
+    _override(QueueViewService(reader))
+
+    response = client.get("/api/v1/queues/1/service-accesses")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [entry["service_access_id"] for entry in body["entries"]] == [10]
+    # The service resolved and used today's operational day.
+    assert reader.list_calls[0][1] == date.today()
 
 
 def test_queue_view_route_is_version_prefixed():
