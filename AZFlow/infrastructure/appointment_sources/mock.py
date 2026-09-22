@@ -15,15 +15,76 @@ _DEFAULT_APPOINTMENTS: Dict[str, List[ExternalAppointmentData]] = {
             external_source_code="MOCK",
             scheduled_at=datetime(2000, 1, 1, 9, 0),
             external_agenda_reference="AGENDA-A",
-            external_appointment_reference="MOCK-APPT-0001",
-            external_patient_reference="MOCK-PAT-0001",
+            external_appointment_reference="MOCK-APPT-LEGACY-0001",
+            external_patient_reference="MOCK-PAT-LEGACY-0001",
         ),
         ExternalAppointmentData(
             external_source_code="MOCK",
             scheduled_at=datetime(2000, 1, 1, 10, 30),
             external_agenda_reference="AGENDA-B",
-            external_appointment_reference="MOCK-APPT-0002",
+            external_appointment_reference="MOCK-APPT-LEGACY-0002",
+            external_patient_reference="MOCK-PAT-LEGACY-0001",
+        ),
+    ],
+    "DEV0001": [
+        ExternalAppointmentData(
+            external_source_code="MOCK",
+            scheduled_at=datetime(2000, 1, 1, 9, 30),
+            external_agenda_reference="AGENDA-A",
+            external_appointment_reference="MOCK-APPT-0001",
             external_patient_reference="MOCK-PAT-0001",
+        ),
+    ],
+    "DEV0002": [
+        ExternalAppointmentData(
+            external_source_code="MOCK",
+            scheduled_at=datetime(2000, 1, 1, 8, 45),
+            external_agenda_reference="AGENDA-A",
+            external_appointment_reference="MOCK-APPT-0002",
+            external_patient_reference="MOCK-PAT-0002",
+        ),
+    ],
+    "DEV0003": [
+        ExternalAppointmentData(
+            external_source_code="MOCK",
+            scheduled_at=datetime(2000, 1, 1, 10, 15),
+            external_agenda_reference="AGENDA-B",
+            external_appointment_reference="MOCK-APPT-0003",
+            external_patient_reference="MOCK-PAT-0003",
+        ),
+    ],
+    "DEV0004": [
+        ExternalAppointmentData(
+            external_source_code="MOCK",
+            scheduled_at=datetime(2000, 1, 1, 9, 0),
+            external_agenda_reference="AGENDA-B",
+            external_appointment_reference="MOCK-APPT-0004",
+            external_patient_reference="MOCK-PAT-0004",
+        ),
+    ],
+    "DEV0005": [
+        ExternalAppointmentData(
+            external_source_code="MOCK",
+            scheduled_at=datetime(2000, 1, 1, 11, 0),
+            external_agenda_reference="AGENDA-A",
+            external_appointment_reference="MOCK-APPT-0005",
+            external_patient_reference="MOCK-PAT-0005",
+        ),
+    ],
+    "DEV0006": [
+        ExternalAppointmentData(
+            external_source_code="MOCK",
+            scheduled_at=datetime(2000, 1, 1, 9, 15),
+            external_agenda_reference="AGENDA-A",
+            external_appointment_reference="MOCK-APPT-0006",
+            external_patient_reference="MOCK-PAT-0006",
+        ),
+        ExternalAppointmentData(
+            external_source_code="MOCK",
+            scheduled_at=datetime(2000, 1, 1, 10, 30),
+            external_agenda_reference="AGENDA-B",
+            external_appointment_reference="MOCK-APPT-0007",
+            external_patient_reference="MOCK-PAT-0006",
         ),
     ],
 }
