@@ -141,8 +141,9 @@ def build_calling_service_provider(
 def wire_calling(application: FastAPI) -> None:
     """Connect the Patient Calling service to the FastAPI application
 
-    A single in-process publisher is shared across requests; it holds no
-    per-request state. Tests can replace this dependency with a fake service.
+    A single in-process publisher is shared across requests and intentionally
+    keeps the published events in memory, shared across those requests. Tests
+    can replace this dependency with a fake service.
     """
     settings = load_settings()
     publisher = InProcessCallEventPublisher()

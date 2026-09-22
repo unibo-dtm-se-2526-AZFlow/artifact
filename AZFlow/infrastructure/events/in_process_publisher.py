@@ -13,8 +13,9 @@ _logger = logging.getLogger(__name__)
 class InProcessCallEventPublisher:
     """Publish call events inside the running process.
 
-    It keeps the published events in memory so tests and a future consumer
-    can read them. There is no broker, outbox or retry.
+    It intentionally keeps the published events in memory so tests and a future
+    consumer can read them. When one instance is shared, that event list is
+    shared across requests. There is no broker, outbox or retry.
     """
 
     def __init__(self) -> None:

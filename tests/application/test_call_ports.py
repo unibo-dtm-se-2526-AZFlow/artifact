@@ -12,7 +12,6 @@ from AZFlow.application.ports.call_repository import CallRepository
 from AZFlow.domain.agenda import Agenda
 from AZFlow.domain.daily_presence import DailyPresence
 from AZFlow.domain.patient_identifier import PatientIdentifier
-from AZFlow.domain.queue import Queue, QueuePolicy, QueueStatus
 from AZFlow.domain.service_access import ServiceAccess, ServiceAccessState
 from AZFlow.domain.ticket_master import TicketMaster
 
@@ -85,18 +84,8 @@ def test_any_object_matching_the_protocol_is_a_call_event_publisher():
 
 def test_any_object_matching_the_protocol_is_a_call_repository():
     service_access = _service_access()
-    queue = Queue(
-        id=1,
-        status=QueueStatus.ACTIVE,
-        policy=QueuePolicy.BY_ARRIVAL,
-        ticket_master=TicketMaster(id=1, prefix="AAA"),
-        agendas=[_agenda()],
-    )
 
     class InMemoryCallRepository:
-        def load_queue(self, queue_id: int) -> Optional[Queue]:
-            return queue if queue_id == queue.id else None
-
         def try_call(self, service_access_id: int) -> Optional[ServiceAccess]:
             if service_access_id == service_access.id:
                 return service_access.called()
@@ -104,8 +93,6 @@ def test_any_object_matching_the_protocol_is_a_call_repository():
 
     repository: CallRepository = InMemoryCallRepository()
 
-    assert repository.load_queue(1) is queue
-    assert repository.load_queue(2) is None
     called = repository.try_call(12)
     assert called is not None
     assert called.state is ServiceAccessState.CALLED

@@ -1,8 +1,9 @@
 """PostgreSQL implementation of CallRepository
 
-The caller owns the database connection. This adapter manages transactions and
-converts database rows into domain objects. Concurrency relies only on an
-atomic conditional UPDATE, not on explicit row locks.
+The caller owns the database connection. This adapter performs the atomic
+conditional transition and builds the resulting ServiceAccess from database
+rows. Concurrency relies only on an atomic conditional UPDATE, not on explicit
+row locks.
 """
 
 from __future__ import annotations
@@ -16,7 +17,6 @@ from AZFlow.domain.appointment import Appointment
 from AZFlow.domain.daily_presence import DailyPresence
 from AZFlow.domain.external_source import ExternalSource
 from AZFlow.domain.patient_identifier import PatientIdentifier
-from AZFlow.domain.queue import Queue, QueuePolicy, QueueStatus
 from AZFlow.domain.service_access import ServiceAccess, ServiceAccessState
 from AZFlow.domain.ticket_master import TicketMaster
 
@@ -28,46 +28,6 @@ class PostgresCallRepository:
         self._conn = connection
         # Each write operation manages its own transaction
         self._conn.autocommit = False
-
-    def load_queue(self, queue_id: int) -> Optional[Queue]:
-        """Return the Queue with its served Agendas, or None when not found"""
-        with self._conn.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT q.id, q.status, q.policy, tm.id, tm.prefix
-                FROM queue q
-                JOIN ticket_master tm ON tm.id = q.ticket_master_id
-                WHERE q.id = %s
-                """,
-                (queue_id,),
-            )
-            row = cursor.fetchone()
-            if row is None:
-                return None
-
-            queue_row_id, status, policy, ticket_master_id, prefix = row
-
-            cursor.execute(
-                """
-                SELECT a.id, a.name
-                FROM queue_agenda qa
-                JOIN agenda a ON a.id = qa.agenda_id
-                WHERE qa.queue_id = %s
-                """,
-                (queue_row_id,),
-            )
-            agendas = [
-                Agenda(id=agenda_id, name=name)
-                for (agenda_id, name) in cursor.fetchall()
-            ]
-
-        return Queue(
-            id=queue_row_id,
-            status=QueueStatus(status),
-            policy=QueuePolicy(policy),
-            ticket_master=TicketMaster(id=ticket_master_id, prefix=prefix),
-            agendas=agendas,
-        )
 
     def try_call(self, service_access_id: int) -> Optional[ServiceAccess]:
         """Try the WAITING to CALLED transition of one ServiceAccess.

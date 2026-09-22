@@ -181,13 +181,9 @@ class FakeCallRepository:
     runs before the transition.
     """
 
-    def __init__(self, queues: Dict[int, Queue], store: _Store) -> None:
-        self._queues = dict(queues)
+    def __init__(self, store: _Store) -> None:
         self._store = store
         self.try_call_ids: List[int] = []
-
-    def load_queue(self, queue_id: int) -> Optional[Queue]:
-        return self._queues.get(queue_id)
 
     def try_call(self, service_access_id: int) -> Optional[ServiceAccess]:
         self.try_call_ids.append(service_access_id)
@@ -212,7 +208,7 @@ def _build(
     store = _Store(candidates)
     queues = {queue.id: queue}
     reader = FakeCallingReader(queues, store)
-    repository = FakeCallRepository(queues, store)
+    repository = FakeCallRepository(store)
     publisher = RecordingPublisher()
     service = CallingService(reader, repository, publisher)
     return service, reader, repository, publisher, store

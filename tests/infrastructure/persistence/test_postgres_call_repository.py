@@ -5,8 +5,8 @@ These run against a real database and are skipped when no DSN is provided
 conditional-UPDATE semantics of try_call, the concurrency invariant that at
 most one attempt transitions the same WAITING ServiceAccess (Property 1),
 the CallingService optimistic call-next and call-specific races against the
-real database, the missing-public-call-code guard (no transition, no event),
-and load_queue returning the expected Queue with its Agendas.
+real database, and the missing-public-call-code guard (no transition, no
+event).
 """
 
 from __future__ import annotations
@@ -25,7 +25,6 @@ from AZFlow.application.errors import (
     NoPatientToCallError,
     ServiceAccessNotCallableError,
 )
-from AZFlow.domain.queue import QueuePolicy, QueueStatus
 from AZFlow.domain.service_access import ServiceAccessState
 from AZFlow.infrastructure.events.in_process_publisher import (
     InProcessCallEventPublisher,
@@ -202,30 +201,6 @@ def test_try_call_returns_row_for_waiting_and_none_for_called(connection):
     second = repo.try_call(sa_id)
     assert second is None
     assert _read_state(connection, sa_id) == "CALLED"
-
-
-def test_load_queue_returns_queue_with_agendas(connection):
-    """Light eligibility check: load_queue returns the Queue and its Agendas."""
-    source = seed_source(connection)
-    agenda_a = seed_external_agenda(connection, source, "Cardiology", "AGENDA-A").agenda
-    agenda_b = seed_external_agenda(connection, source, "Neurology", "AGENDA-B").agenda
-    ticket_master = seed_ticket_master(connection, "AAA")
-    queue_id = seed_queue(
-        connection,
-        ticket_master,
-        [agenda_a.id, agenda_b.id],
-        status="ACTIVE",
-        policy="BY_APPOINTMENT",
-    )
-
-    repo = PostgresCallRepository(connection)
-    queue = repo.load_queue(queue_id)
-
-    assert queue is not None
-    assert queue.id == queue_id
-    assert queue.status is QueueStatus.ACTIVE
-    assert queue.policy is QueuePolicy.BY_APPOINTMENT
-    assert sorted(a.id for a in queue.agendas) == sorted([agenda_a.id, agenda_b.id])
 
 
 # Concurrency tests (Property 1)
