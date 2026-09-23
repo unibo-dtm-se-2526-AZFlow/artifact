@@ -14,6 +14,7 @@ can be checked on one thread.
 from __future__ import annotations
 
 import asyncio
+import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterator, List, Optional
@@ -228,3 +229,55 @@ def test_publish_skips_when_loop_not_bound():
     hub.publish(_event(service_access_id=7))
 
     assert _drain(queue) == []
+
+
+def test_registry_access_is_thread_safe_under_concurrent_registration():
+    """publish() run from a worker thread while the main thread registers and
+    unregisters many connections must not raise and must not corrupt state.
+
+    The hub snapshots the target queues under a lock before scheduling, so
+    concurrent registry mutation cannot break iteration. A "set changed size
+    during iteration" style error would surface here if the lock were missing.
+    """
+    read_model = _FakeReadModel([5], [], {7: _display_call()})
+    loop = _ImmediateLoop()
+    hub = WebSocketCallHub(_factory(read_model), loop=loop)
+
+    stop = threading.Event()
+    errors: List[BaseException] = []
+
+    # A stable queue that stays registered for the whole run.
+    stable: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue()
+    hub.register(waiting_room_key(5), stable)
+
+    def churn() -> None:
+        try:
+            queues: List["asyncio.Queue[Dict[str, Any]]"] = [
+                asyncio.Queue() for _ in range(50)
+            ]
+            while not stop.is_set():
+                for q in queues:
+                    hub.register(waiting_room_key(5), q)
+                for q in queues:
+                    hub.unregister(waiting_room_key(5), q)
+        except BaseException as exc:  # pragma: no cover - only on failure
+            errors.append(exc)
+
+    def publish_many() -> None:
+        try:
+            for _ in range(500):
+                hub.publish(_event(service_access_id=7))
+        except BaseException as exc:  # pragma: no cover - only on failure
+            errors.append(exc)
+
+    churner = threading.Thread(target=churn)
+    publisher = threading.Thread(target=publish_many)
+    churner.start()
+    publisher.start()
+    publisher.join()
+    stop.set()
+    churner.join()
+
+    assert errors == [], f"thread-safety errors: {errors}"
+    # The stable connection received at least one message and the run finished.
+    assert not stable.empty()
