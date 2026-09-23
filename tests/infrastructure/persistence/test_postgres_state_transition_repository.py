@@ -27,11 +27,14 @@ from AZFlow.infrastructure.persistence.postgres_state_transition_repository impo
 )
 from tests.infrastructure.persistence.seed import (
     seed_external_agenda,
+    seed_location_node,
+    seed_room,
     seed_source,
     seed_ticket_master,
 )
 
 OPERATIONAL_DAY = date(2024, 3, 15)
+ROOM_REFERENCE = "ROOM-3"
 
 
 # Local seeding helpers, mirroring the pattern in
@@ -79,18 +82,19 @@ def _seed_service_access(
     agenda_id: int,
     state: str = "WAITING",
     appointment_id: Optional[int] = None,
+    room_id: Optional[int] = None,
 ) -> int:
     """Insert a service_access row in the given state and return its id."""
     with conn.cursor() as cursor:  # type: ignore[attr-defined]
         cursor.execute(
             """
             INSERT INTO service_access (
-                daily_presence_id, agenda_id, appointment_id, state
+                daily_presence_id, agenda_id, appointment_id, state, room_id
             )
-            VALUES (%s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING id
             """,
-            (daily_presence_id, agenda_id, appointment_id, state),
+            (daily_presence_id, agenda_id, appointment_id, state, room_id),
         )
         service_access_id = cursor.fetchone()[0]
     conn.commit()  # type: ignore[attr-defined]
@@ -107,20 +111,60 @@ def _read_state(conn: "object", service_access_id: int) -> str:
         return cursor.fetchone()[0]
 
 
-def _seed_access_in_state(conn: "object", state: str) -> int:
-    """Seed the minimal configuration and a service_access in the given state."""
+def _read_room_id(conn: "object", service_access_id: int) -> Optional[int]:
+    """Read the persisted room_id of a service_access row."""
+    with conn.cursor() as cursor:  # type: ignore[attr-defined]
+        cursor.execute(
+            "SELECT room_id FROM service_access WHERE id = %s",
+            (service_access_id,),
+        )
+        return cursor.fetchone()[0]
+
+
+def _transition_rows(
+    conn: "object", service_access_id: int
+) -> "list[tuple[Optional[str], str, object]]":
+    """Return (previous_state, resulting_state, occurred_at) transition rows
+    for a service_access, ordered by id."""
+    with conn.cursor() as cursor:  # type: ignore[attr-defined]
+        cursor.execute(
+            """
+            SELECT previous_state, resulting_state, occurred_at
+            FROM service_access_transition
+            WHERE service_access_id = %s
+            ORDER BY id
+            """,
+            (service_access_id,),
+        )
+        return cursor.fetchall()
+
+
+def _seed_configured_room(conn: "object") -> int:
+    """Seed a LocationNode and a configured Room, and return the Room id."""
+    node_id = seed_location_node(conn, "Radiotherapy")
+    return seed_room(conn, node_id, ROOM_REFERENCE, "Room 3")
+
+
+def _seed_access_in_state(
+    conn: "object", state: str, room_id: Optional[int] = None
+) -> int:
+    """Seed the minimal configuration and a service_access in the given state.
+
+    An optional call-time room_id can be set, which admission reuses.
+    """
     source = seed_source(conn)
     agenda = seed_external_agenda(conn, source, "Cardiology", "AGENDA-A").agenda
     ticket_master = seed_ticket_master(conn, "AAA")
     dp_id = _seed_daily_presence(conn, ticket_master.id, "AAA001")
-    return _seed_service_access(conn, dp_id, agenda.id, state)
+    return _seed_service_access(conn, dp_id, agenda.id, state, room_id=room_id)
 
 
 # Durable persistence (Property 8; Req 8.3, 11.12)
 
 
 def test_try_suspend_persists_suspended_state_durably(connection):
-    """A successful suspend persists state='SUSPENDED' durably."""
+    """A successful suspend persists state='SUSPENDED' durably and records one
+    WAITING->SUSPENDED transition (Property 1)."""
     sa_id = _seed_access_in_state(connection, "WAITING")
 
     repo = PostgresStateTransitionRepository(connection)
@@ -133,9 +177,17 @@ def test_try_suspend_persists_suspended_state_durably(connection):
     # Re-read on a fresh query to confirm durability.
     assert _read_state(connection, sa_id) == "SUSPENDED"
 
+    rows = _transition_rows(connection, sa_id)
+    assert len(rows) == 1
+    previous_state, resulting_state, occurred_at = rows[0]
+    assert previous_state == "WAITING"
+    assert resulting_state == "SUSPENDED"
+    assert occurred_at is not None
+
 
 def test_try_restore_persists_waiting_state_durably(connection):
-    """A successful restore persists state='WAITING' durably."""
+    """A successful restore persists state='WAITING' durably and records one
+    SUSPENDED->WAITING transition (Property 1)."""
     sa_id = _seed_access_in_state(connection, "SUSPENDED")
 
     repo = PostgresStateTransitionRepository(connection)
@@ -146,10 +198,20 @@ def test_try_restore_persists_waiting_state_durably(connection):
     assert restored.state is ServiceAccessState.WAITING
     assert _read_state(connection, sa_id) == "WAITING"
 
+    rows = _transition_rows(connection, sa_id)
+    assert len(rows) == 1
+    previous_state, resulting_state, occurred_at = rows[0]
+    assert previous_state == "SUSPENDED"
+    assert resulting_state == "WAITING"
+    assert occurred_at is not None
 
-def test_try_admit_persists_admitted_state_durably(connection):
-    """A successful confirm admission persists state='ADMITTED' durably."""
-    sa_id = _seed_access_in_state(connection, "CALLED")
+
+def test_try_admit_persists_admitted_state_durably_and_reuses_room(connection):
+    """A successful confirm admission persists state='ADMITTED' durably, records
+    one CALLED->ADMITTED transition, and reuses the stored room_id unchanged
+    (Property 1 / 5)."""
+    room_id = _seed_configured_room(connection)
+    sa_id = _seed_access_in_state(connection, "CALLED", room_id=room_id)
 
     repo = PostgresStateTransitionRepository(connection)
     admitted = repo.try_admit(sa_id)
@@ -158,13 +220,23 @@ def test_try_admit_persists_admitted_state_durably(connection):
     assert admitted.id == sa_id
     assert admitted.state is ServiceAccessState.ADMITTED
     assert _read_state(connection, sa_id) == "ADMITTED"
+    # Admission does not touch the stored call-time Room.
+    assert _read_room_id(connection, sa_id) == room_id
+
+    rows = _transition_rows(connection, sa_id)
+    assert len(rows) == 1
+    previous_state, resulting_state, occurred_at = rows[0]
+    assert previous_state == "CALLED"
+    assert resulting_state == "ADMITTED"
+    assert occurred_at is not None
 
 
 # Conditional-UPDATE semantics: row for the expected state, none otherwise
 
 
 def test_try_suspend_returns_row_only_from_waiting(connection):
-    """The conditional UPDATE returns a row for WAITING and None otherwise."""
+    """The conditional UPDATE returns a row for WAITING and None otherwise, and
+    a miss writes no transition record (Property 1)."""
     sa_id = _seed_access_in_state(connection, "WAITING")
     repo = PostgresStateTransitionRepository(connection)
 
@@ -172,14 +244,17 @@ def test_try_suspend_returns_row_only_from_waiting(connection):
     assert first is not None
     assert first.state is ServiceAccessState.SUSPENDED
 
-    # A second attempt on an already-SUSPENDED target performs no transition.
+    # A second attempt on an already-SUSPENDED target performs no transition and
+    # adds no transition record.
     second = repo.try_suspend(sa_id)
     assert second is None
     assert _read_state(connection, sa_id) == "SUSPENDED"
+    assert len(_transition_rows(connection, sa_id)) == 1
 
 
 def test_try_restore_returns_row_only_from_suspended(connection):
-    """The conditional UPDATE returns a row for SUSPENDED and None otherwise."""
+    """The conditional UPDATE returns a row for SUSPENDED and None otherwise, and
+    a miss writes no transition record (Property 1)."""
     sa_id = _seed_access_in_state(connection, "SUSPENDED")
     repo = PostgresStateTransitionRepository(connection)
 
@@ -190,11 +265,14 @@ def test_try_restore_returns_row_only_from_suspended(connection):
     second = repo.try_restore(sa_id)
     assert second is None
     assert _read_state(connection, sa_id) == "WAITING"
+    assert len(_transition_rows(connection, sa_id)) == 1
 
 
 def test_try_admit_returns_row_only_from_called(connection):
-    """The conditional UPDATE returns a row for CALLED and None otherwise."""
-    sa_id = _seed_access_in_state(connection, "CALLED")
+    """The conditional UPDATE returns a row for CALLED and None otherwise, and
+    a miss writes no transition record (Property 1)."""
+    room_id = _seed_configured_room(connection)
+    sa_id = _seed_access_in_state(connection, "CALLED", room_id=room_id)
     repo = PostgresStateTransitionRepository(connection)
 
     first = repo.try_admit(sa_id)
@@ -204,6 +282,7 @@ def test_try_admit_returns_row_only_from_called(connection):
     second = repo.try_admit(sa_id)
     assert second is None
     assert _read_state(connection, sa_id) == "ADMITTED"
+    assert len(_transition_rows(connection, sa_id)) == 1
 
 
 def test_try_transition_returns_none_for_missing_target(connection):
@@ -261,25 +340,31 @@ def _concurrent_transition_wins_once(dsn: str, sa_id: int, method_name: str) -> 
 
 
 def test_concurrent_suspend_on_same_waiting_access_transitions_once(connection, dsn):
-    """Two concurrent try_suspend on the same WAITING target: exactly one wins."""
+    """Two concurrent try_suspend on the same WAITING target: exactly one wins
+    and writes exactly one transition record (Property 1)."""
     sa_id = _seed_access_in_state(connection, "WAITING")
     _concurrent_transition_wins_once(dsn, sa_id, "try_suspend")
     assert _read_state(connection, sa_id) == "SUSPENDED"
+    assert len(_transition_rows(connection, sa_id)) == 1
 
 
 def test_concurrent_restore_on_same_suspended_access_transitions_once(connection, dsn):
     """Two concurrent try_restore on the same SUSPENDED target: exactly one
-    wins."""
+    wins and writes exactly one transition record (Property 1)."""
     sa_id = _seed_access_in_state(connection, "SUSPENDED")
     _concurrent_transition_wins_once(dsn, sa_id, "try_restore")
     assert _read_state(connection, sa_id) == "WAITING"
+    assert len(_transition_rows(connection, sa_id)) == 1
 
 
 def test_concurrent_admit_on_same_called_access_transitions_once(connection, dsn):
-    """Two concurrent try_admit on the same CALLED target: exactly one wins."""
-    sa_id = _seed_access_in_state(connection, "CALLED")
+    """Two concurrent try_admit on the same CALLED target: exactly one wins
+    and writes exactly one transition record (Property 1)."""
+    room_id = _seed_configured_room(connection)
+    sa_id = _seed_access_in_state(connection, "CALLED", room_id=room_id)
     _concurrent_transition_wins_once(dsn, sa_id, "try_admit")
     assert _read_state(connection, sa_id) == "ADMITTED"
+    assert len(_transition_rows(connection, sa_id)) == 1
 
 
 # A failing persist leaves the stored state unchanged (Property 8; Req 8.4)

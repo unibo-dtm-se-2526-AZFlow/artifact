@@ -41,7 +41,9 @@ from AZFlow.infrastructure.persistence.postgres_queue_view_reader import (
 )
 from tests.infrastructure.persistence.seed import (
     seed_external_agenda,
+    seed_location_node,
     seed_queue,
+    seed_room,
     seed_source,
     seed_ticket_master,
 )
@@ -71,6 +73,9 @@ def wired_client(connection, dsn: str) -> Iterator[TestClient]:
         status="ACTIVE",
         policy="BY_ARRIVAL",
     )
+    # A configured Room the calls resolve room_reference against.
+    node_id = seed_location_node(connection, "Radiotherapy")
+    seed_room(connection, node_id, _ROOM, "Room 3")
 
     appointment_source = MockAppointmentSource()
     publisher = InProcessCallEventPublisher()
@@ -101,6 +106,28 @@ def _read_state(connection, service_access_id: int) -> str:
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT state FROM service_access WHERE id = %s",
+            (service_access_id,),
+        )
+        return cursor.fetchone()[0]
+
+
+def _read_room_id(connection, service_access_id: int):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT room_id FROM service_access WHERE id = %s",
+            (service_access_id,),
+        )
+        return cursor.fetchone()[0]
+
+
+def _called_transition_count(connection, service_access_id: int) -> int:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT count(*) FROM service_access_transition
+            WHERE service_access_id = %s
+              AND previous_state = 'WAITING' AND resulting_state = 'CALLED'
+            """,
             (service_access_id,),
         )
         return cursor.fetchone()[0]
@@ -156,8 +183,11 @@ def test_check_in_then_call_next_then_call_specific_end_to_end(
     assert body["room_reference"] == _ROOM
     first_called_id = body["service_access_id"]
 
-    # The transition is durable in the database.
+    # The transition is durable in the database, with the call-time Room set and
+    # exactly one WAITING->CALLED transition recorded.
     assert _read_state(connection, first_called_id) == "CALLED"
+    assert _read_room_id(connection, first_called_id) is not None
+    assert _called_transition_count(connection, first_called_id) == 1
 
     # No identifying Patient data leaks into the response.
     text = call_next.text
@@ -179,6 +209,8 @@ def test_check_in_then_call_next_then_call_specific_end_to_end(
     assert specific_body["state"] == "CALLED"
     assert specific_body["room_reference"] == _ROOM
     assert _read_state(connection, target_id) == "CALLED"
+    assert _read_room_id(connection, target_id) is not None
+    assert _called_transition_count(connection, target_id) == 1
 
     # Exactly one event per successful call reached the publication boundary,
     # and no event carries the Patient Identifier value.

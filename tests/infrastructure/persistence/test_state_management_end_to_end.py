@@ -48,7 +48,9 @@ from AZFlow.infrastructure.persistence.postgres_state_transition_repository impo
 )
 from tests.infrastructure.persistence.seed import (
     seed_external_agenda,
+    seed_location_node,
     seed_queue,
+    seed_room,
     seed_source,
     seed_ticket_master,
 )
@@ -77,6 +79,10 @@ def wired_client(connection, dsn: str) -> Iterator[TestClient]:
         status="ACTIVE",
         policy="BY_ARRIVAL",
     )
+    # A configured Room the call resolves room_reference against, and which
+    # admission then reuses.
+    node_id = seed_location_node(connection, "Radiotherapy")
+    seed_room(connection, node_id, _ROOM, "Room 3")
 
     appointment_source = MockAppointmentSource()
     publisher = InProcessCallEventPublisher()
@@ -180,9 +186,9 @@ def test_suspend_then_restore_end_to_end(wired_client, connection):
 
 
 def test_call_then_confirm_admission_end_to_end(wired_client, connection):
-    """Req 11.9/11.10/11.12: call a Patient then confirm admission through
-    /api/v1, carrying the Room reference unchanged and persisting ADMITTED
-    durably, with no identifying data exposed."""
+    """Req 5: call a Patient then confirm admission through /api/v1. Admission
+    accepts no room_reference and reuses the Room stored at call time,
+    persisting ADMITTED durably with no identifying data exposed."""
     public_call_code = _check_in(wired_client)
     queue_id = wired_client.queue_id
 
@@ -195,24 +201,21 @@ def test_call_then_confirm_admission_end_to_end(wired_client, connection):
     called_id = call_next.json()["service_access_id"]
     assert _read_state(connection, called_id) == "CALLED"
 
-    admission = wired_client.post(
-        f"/api/v1/service-accesses/{called_id}/admission",
-        json={"room_reference": _ROOM},
-    )
+    # Admission takes no room_reference; it uses the stored call-time Room.
+    admission = wired_client.post(f"/api/v1/service-accesses/{called_id}/admission")
     assert admission.status_code == 200
     body = admission.json()
+    # room_reference is derived from the stored Room and currently left unset,
+    # so response_model_exclude_none omits it from the admission body.
     assert set(body.keys()) == {
         "public_call_code",
         "service_access_id",
         "agenda",
         "state",
-        "room_reference",
     }
     assert body["public_call_code"] == public_call_code
     assert body["service_access_id"] == called_id
     assert body["state"] == "ADMITTED"
-    # The Room reference is carried unchanged, admission only.
-    assert body["room_reference"] == _ROOM
     _assert_no_identifier(admission)
     # The ADMITTED state is durable.
     assert _read_state(connection, called_id) == "ADMITTED"
@@ -221,37 +224,32 @@ def test_call_then_confirm_admission_end_to_end(wired_client, connection):
 def test_state_management_failures_are_distinguishable_end_to_end(
     wired_client, connection
 ):
-    """Req 11.2/11.3/11.4/11.11: the not-found, not-in-expected-state and
-    missing-room outcomes are distinguishable through the wired API."""
+    """Req 5/11: each state-management failure maps to its expected status.
+
+    Admission no longer accepts a room_reference, so the earlier missing-room
+    precondition case is gone; instead admitting a non-CALLED target is a
+    not-admittable conflict. Each outcome maps to its specific status:
+    not-found suspend -> 404, not-restorable restore -> 409, not-admittable
+    admission -> 409. None changes the target state.
+    """
     _check_in(wired_client)
     waiting_id = _waiting_ids(connection)[0]
 
-    # Not found: no ServiceAccess exists for a large id.
+    # Not found: no ServiceAccess exists for a large id -> 404.
     not_found = wired_client.post("/api/v1/service-accesses/999999/suspend")
     assert not_found.status_code == 404
 
     # Not in the expected state: restore requires SUSPENDED, but the target is
-    # WAITING, so it is not restorable.
+    # WAITING, so it is not restorable -> 409.
     not_restorable = wired_client.post(f"/api/v1/service-accesses/{waiting_id}/restore")
     assert not_restorable.status_code == 409
 
-    # Missing Room reference for admission is a precondition failure.
-    missing_room = wired_client.post(
-        f"/api/v1/service-accesses/{waiting_id}/admission",
-        json={"room_reference": "   "},
+    # Not admittable: admission requires CALLED, but the target is WAITING, so
+    # it is not admittable -> 409.
+    not_admittable = wired_client.post(
+        f"/api/v1/service-accesses/{waiting_id}/admission"
     )
-    assert missing_room.status_code == 422
+    assert not_admittable.status_code == 409
 
-    # The three outcomes are distinguishable from one another.
-    assert (
-        len(
-            {
-                not_found.status_code,
-                not_restorable.status_code,
-                missing_room.status_code,
-            }
-        )
-        == 3
-    )
     # None of the failing attempts changed the target state.
     assert _read_state(connection, waiting_id) == "WAITING"

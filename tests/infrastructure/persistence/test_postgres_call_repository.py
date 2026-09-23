@@ -23,6 +23,7 @@ from AZFlow.application.calling import CallingService
 from AZFlow.application.errors import (
     MissingPublicCallCodeError,
     NoPatientToCallError,
+    RoomNotFoundError,
     ServiceAccessNotCallableError,
 )
 from AZFlow.domain.service_access import ServiceAccessState
@@ -37,7 +38,9 @@ from AZFlow.infrastructure.persistence.postgres_queue_view_reader import (
 )
 from tests.infrastructure.persistence.seed import (
     seed_external_agenda,
+    seed_location_node,
     seed_queue,
+    seed_room,
     seed_source,
     seed_ticket_master,
 )
@@ -160,6 +163,40 @@ def _read_state(conn: "object", service_access_id: int) -> str:
         return cursor.fetchone()[0]
 
 
+def _read_room_id(conn: "object", service_access_id: int) -> Optional[int]:
+    """Read the persisted call-time room_id of a service_access row."""
+    with conn.cursor() as cursor:  # type: ignore[attr-defined]
+        cursor.execute(
+            "SELECT room_id FROM service_access WHERE id = %s",
+            (service_access_id,),
+        )
+        return cursor.fetchone()[0]
+
+
+def _seed_configured_room(conn: "object", reference: str = ROOM_REFERENCE) -> int:
+    """Seed a LocationNode and a configured Room, and return the Room id."""
+    node_id = seed_location_node(conn, "Radiotherapy")
+    return seed_room(conn, node_id, reference, "Room 3")
+
+
+def _transition_rows(
+    conn: "object", service_access_id: int
+) -> "list[tuple[Optional[str], str, object]]":
+    """Return (previous_state, resulting_state, occurred_at) transition rows
+    for a service_access, ordered by id."""
+    with conn.cursor() as cursor:  # type: ignore[attr-defined]
+        cursor.execute(
+            """
+            SELECT previous_state, resulting_state, occurred_at
+            FROM service_access_transition
+            WHERE service_access_id = %s
+            ORDER BY id
+            """,
+            (service_access_id,),
+        )
+        return cursor.fetchall()
+
+
 # Repository-level tests
 
 
@@ -170,9 +207,10 @@ def test_try_call_persists_called_state_durably(connection):
     ticket_master = seed_ticket_master(connection, "AAA")
     dp_id = _seed_daily_presence(connection, ticket_master.id, "AAA001")
     sa_id = _seed_service_access(connection, dp_id, agenda.id, None)
+    room_id = _seed_configured_room(connection)
 
     repo = PostgresCallRepository(connection)
-    called = repo.try_call(sa_id)
+    called = repo.try_call(sa_id, room_id)
 
     assert called is not None
     assert called.id == sa_id
@@ -183,6 +221,32 @@ def test_try_call_persists_called_state_durably(connection):
     assert _read_state(connection, sa_id) == "CALLED"
 
 
+def test_try_call_persists_room_and_one_transition_record(connection):
+    """Property 1 / 5: a successful call persists room_id and exactly one
+    WAITING->CALLED transition record in the same transaction."""
+    source = seed_source(connection)
+    agenda = seed_external_agenda(connection, source, "Cardiology", "AGENDA-A").agenda
+    ticket_master = seed_ticket_master(connection, "AAA")
+    dp_id = _seed_daily_presence(connection, ticket_master.id, "AAA001")
+    sa_id = _seed_service_access(connection, dp_id, agenda.id, None)
+    room_id = _seed_configured_room(connection)
+
+    repo = PostgresCallRepository(connection)
+    called = repo.try_call(sa_id, room_id)
+    assert called is not None
+
+    # The passed Room is persisted on the ServiceAccess.
+    assert _read_room_id(connection, sa_id) == room_id
+
+    # Exactly one WAITING->CALLED record, with a non-null occurred_at.
+    rows = _transition_rows(connection, sa_id)
+    assert len(rows) == 1
+    previous_state, resulting_state, occurred_at = rows[0]
+    assert previous_state == "WAITING"
+    assert resulting_state == "CALLED"
+    assert occurred_at is not None
+
+
 def test_try_call_returns_row_for_waiting_and_none_for_called(connection):
     """The conditional UPDATE returns a row for WAITING and None for CALLED."""
     source = seed_source(connection)
@@ -190,17 +254,31 @@ def test_try_call_returns_row_for_waiting_and_none_for_called(connection):
     ticket_master = seed_ticket_master(connection, "AAA")
     dp_id = _seed_daily_presence(connection, ticket_master.id, "AAA001")
     sa_id = _seed_service_access(connection, dp_id, agenda.id, None)
+    room_id = _seed_configured_room(connection)
 
     repo = PostgresCallRepository(connection)
 
-    first = repo.try_call(sa_id)
+    first = repo.try_call(sa_id, room_id)
     assert first is not None
     assert first.state is ServiceAccessState.CALLED
 
-    # A second attempt on an already-CALLED target performs no transition.
-    second = repo.try_call(sa_id)
+    # A second attempt on an already-CALLED target performs no transition, adds
+    # no transition record and does not change the stored room_id.
+    second = repo.try_call(sa_id, room_id)
     assert second is None
     assert _read_state(connection, sa_id) == "CALLED"
+    assert _read_room_id(connection, sa_id) == room_id
+    assert len(_transition_rows(connection, sa_id)) == 1
+
+
+def test_resolve_room_returns_none_for_unknown_reference(connection):
+    """resolve_room returns None for a reference that is not a configured Room;
+    rejecting an unknown Room is a CallingService concern, not the repo's."""
+    _seed_configured_room(connection)
+    repo = PostgresCallRepository(connection)
+
+    assert repo.resolve_room(ROOM_REFERENCE) is not None
+    assert repo.resolve_room("NOPE") is None
 
 
 # Concurrency tests (Property 1)
@@ -208,12 +286,14 @@ def test_try_call_returns_row_for_waiting_and_none_for_called(connection):
 
 def test_concurrent_try_call_on_same_waiting_access_transitions_once(connection, dsn):
     """Property 1 / Req 4.1, 4.2, 10.8: two concurrent try_call on the same
-    WAITING ServiceAccess: exactly one wins, the other gets None."""
+    WAITING ServiceAccess: exactly one wins and writes one transition record,
+    the other gets None and writes none."""
     source = seed_source(connection)
     agenda = seed_external_agenda(connection, source, "Cardiology", "AGENDA-A").agenda
     ticket_master = seed_ticket_master(connection, "AAA")
     dp_id = _seed_daily_presence(connection, ticket_master.id, "AAA001")
     sa_id = _seed_service_access(connection, dp_id, agenda.id, None)
+    room_id = _seed_configured_room(connection)
 
     barrier = Barrier(2)
 
@@ -221,7 +301,7 @@ def test_concurrent_try_call_on_same_waiting_access_transitions_once(connection,
         with psycopg.connect(dsn) as worker_connection:
             worker_repo = PostgresCallRepository(worker_connection)
             barrier.wait(timeout=10)
-            called = worker_repo.try_call(sa_id)
+            called = worker_repo.try_call(sa_id, room_id)
             return called is not None
 
     with ThreadPoolExecutor(max_workers=2) as executor:
@@ -235,6 +315,9 @@ def test_concurrent_try_call_on_same_waiting_access_transitions_once(connection,
     assert outcomes.count(True) == 1
     assert outcomes.count(False) == 1
     assert _read_state(connection, sa_id) == "CALLED"
+    # The winner set the Room once and wrote exactly one transition record.
+    assert _read_room_id(connection, sa_id) == room_id
+    assert len(_transition_rows(connection, sa_id)) == 1
 
 
 def _make_calling_service(connection):
@@ -266,6 +349,7 @@ def test_concurrent_call_next_two_waiting_succeed_on_different_accesses(
     queue_id = seed_queue(
         connection, ticket_master, [agenda.id], status="ACTIVE", policy="BY_ARRIVAL"
     )
+    _seed_configured_room(connection)
 
     barrier = Barrier(2)
 
@@ -298,6 +382,7 @@ def test_concurrent_call_next_one_waiting_one_succeeds_other_no_patient(
     queue_id = seed_queue(
         connection, ticket_master, [agenda.id], status="ACTIVE", policy="BY_ARRIVAL"
     )
+    _seed_configured_room(connection)
 
     barrier = Barrier(2)
 
@@ -332,6 +417,7 @@ def test_concurrent_call_specific_same_target_one_succeeds_other_not_callable(
     queue_id = seed_queue(
         connection, ticket_master, [agenda.id], status="ACTIVE", policy="BY_ARRIVAL"
     )
+    _seed_configured_room(connection)
 
     barrier = Barrier(2)
 
@@ -371,6 +457,9 @@ def test_missing_public_call_code_leaves_row_waiting_and_publishes_no_event(
     queue_id = seed_queue(
         connection, ticket_master, [agenda.id], status="ACTIVE", policy="BY_ARRIVAL"
     )
+    # Room resolution happens before the code guard, so a configured Room must
+    # exist for the guard to be the failing step.
+    _seed_configured_room(connection)
 
     reader = PostgresQueueViewReader(connection)
     repo = PostgresCallRepository(connection)
@@ -383,4 +472,37 @@ def test_missing_public_call_code_leaves_row_waiting_and_publishes_no_event(
         service.call_specific(queue_id, sa_id, ROOM_REFERENCE, OPERATIONAL_DAY)
 
     assert _read_state(connection, sa_id) == "WAITING"
+    assert publisher.events == []
+    # The guard fires before any transition, so no transition record was
+    # written.
+    assert _transition_rows(connection, sa_id) == []
+
+
+def test_unknown_room_reference_raises_and_writes_nothing(connection):
+    """Property 4: an unknown room_reference raises RoomNotFoundError at the
+    CallingService level with no transition, no transition record and no
+    event, for both call_next and call_specific."""
+    source = seed_source(connection)
+    agenda = seed_external_agenda(connection, source, "Cardiology", "AGENDA-A").agenda
+    ticket_master = seed_ticket_master(connection, "AAA")
+    dp_id = _seed_daily_presence(connection, ticket_master.id, "AAA001")
+    sa_id = _seed_service_access(connection, dp_id, agenda.id, None)
+    queue_id = seed_queue(
+        connection, ticket_master, [agenda.id], status="ACTIVE", policy="BY_ARRIVAL"
+    )
+    # No configured Room is seeded, so resolution fails.
+
+    reader = PostgresQueueViewReader(connection)
+    repo = PostgresCallRepository(connection)
+    publisher = InProcessCallEventPublisher()
+    service = CallingService(reader, repo, publisher)
+
+    with pytest.raises(RoomNotFoundError):
+        service.call_next(queue_id, "NOPE", OPERATIONAL_DAY)
+    with pytest.raises(RoomNotFoundError):
+        service.call_specific(queue_id, sa_id, "NOPE", OPERATIONAL_DAY)
+
+    assert _read_state(connection, sa_id) == "WAITING"
+    assert _read_room_id(connection, sa_id) is None
+    assert _transition_rows(connection, sa_id) == []
     assert publisher.events == []
