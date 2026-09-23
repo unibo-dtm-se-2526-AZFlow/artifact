@@ -22,6 +22,7 @@ from AZFlow.application.errors import (
     NoPatientToCallError,
     QueueInactiveError,
     QueueNotFoundError,
+    RoomNotFoundError,
     ServiceAccessNotCallableError,
     ServiceAccessNotVisibleError,
 )
@@ -42,6 +43,22 @@ _AGENDA_A = Agenda(id=1, name="Cardiology")
 _AGENDA_B = Agenda(id=2, name="Radiology")
 
 _ROOM = "ROOM-3"
+_ROOM_ID = 3
+
+# The "carried unchanged" test calls with this exact (untrimmed) reference, so
+# it must resolve as a configured Room for that call to proceed.
+_ROOM_WITH_SPACES = "  ROOM-with spaces and CASE 42  "
+_ROOM_WITH_SPACES_ID = 42
+
+# References the fake CallRepository resolves to a configured Room id by
+# default, so existing success tests keep working with their room references.
+_KNOWN_ROOMS = {
+    _ROOM: _ROOM_ID,
+    _ROOM_WITH_SPACES: _ROOM_WITH_SPACES_ID,
+}
+
+# A reference no configured Room has, used to exercise the rejection path.
+_UNKNOWN_ROOM = "NO-SUCH-ROOM"
 
 
 def _queue(
@@ -119,6 +136,8 @@ class _Store:
         self.race_once: Set[int] = set()
         # ids already marked CALLED (so a re-read drops them).
         self.called: Set[int] = set()
+        # room_id passed to each successful try_call, keyed by ServiceAccess id.
+        self.called_room_ids: Dict[int, int] = {}
 
     def waiting_candidates(self) -> List[CandidateServiceAccess]:
         """Return current WAITING candidates, dropping called ones."""
@@ -131,7 +150,7 @@ class _Store:
             result.append(candidate)
         return result
 
-    def try_call(self, service_access_id: int) -> Optional[ServiceAccess]:
+    def try_call(self, service_access_id: int, room_id: int) -> Optional[ServiceAccess]:
         candidate = self.candidates.get(service_access_id)
         if candidate is None:
             return None
@@ -145,6 +164,7 @@ class _Store:
         if candidate.state is not ServiceAccessState.WAITING:
             return None
         self.called.add(service_access_id)
+        self.called_room_ids[service_access_id] = room_id
         return _service_access(candidate).called()
 
 
@@ -176,18 +196,37 @@ class FakeCallingReader:
 class FakeCallRepository:
     """CallRepository fake sharing the store with the reader.
 
-    ``try_call`` performs the atomic WAITING -> CALLED transition on the store
-    and records how many times it was invoked, so a test can assert the guard
-    runs before the transition.
+    ``resolve_room`` returns a configured Room id for known references and None
+    otherwise, so the service can reject an unknown Room before any transition.
+    ``try_call`` performs the atomic WAITING -> CALLED transition on the store,
+    records how many times it was invoked and with which room_id, so a test can
+    assert the guard runs before the transition and the resolved room flows
+    through.
     """
 
-    def __init__(self, store: _Store) -> None:
+    def __init__(
+        self,
+        store: _Store,
+        known_rooms: Optional[Dict[str, int]] = None,
+    ) -> None:
         self._store = store
+        # Map of known Room references to their configured Room id. The default
+        # covers the references the existing success tests call with.
+        self.known_rooms: Dict[str, int] = (
+            dict(known_rooms) if known_rooms is not None else dict(_KNOWN_ROOMS)
+        )
+        self.resolve_room_calls: List[str] = []
         self.try_call_ids: List[int] = []
+        self.try_call_room_ids: List[int] = []
 
-    def try_call(self, service_access_id: int) -> Optional[ServiceAccess]:
+    def resolve_room(self, room_reference: str) -> Optional[int]:
+        self.resolve_room_calls.append(room_reference)
+        return self.known_rooms.get(room_reference)
+
+    def try_call(self, service_access_id: int, room_id: int) -> Optional[ServiceAccess]:
         self.try_call_ids.append(service_access_id)
-        return self._store.try_call(service_access_id)
+        self.try_call_room_ids.append(room_id)
+        return self._store.try_call(service_access_id, room_id)
 
 
 class RecordingPublisher:
@@ -203,12 +242,17 @@ class RecordingPublisher:
 def _build(
     queue: Queue,
     candidates: List[CandidateServiceAccess],
+    known_rooms: Optional[Dict[str, int]] = None,
 ):
-    """Wire the service with fakes sharing one store."""
+    """Wire the service with fakes sharing one store.
+
+    ``known_rooms`` overrides the Room references the repository resolves; the
+    default covers the references the existing success tests use.
+    """
     store = _Store(candidates)
     queues = {queue.id: queue}
     reader = FakeCallingReader(queues, store)
-    repository = FakeCallRepository(store)
+    repository = FakeCallRepository(store, known_rooms)
     publisher = RecordingPublisher()
     service = CallingService(reader, repository, publisher)
     return service, reader, repository, publisher, store
@@ -277,6 +321,9 @@ def test_call_next_transitions_head_to_called_and_publishes_one_event():
 
     assert result.state is ServiceAccessState.CALLED
     assert repo.try_call_ids == [40]
+    # The resolved Room id flows through to try_call.
+    assert repo.try_call_room_ids == [_ROOM_ID]
+    assert store.called_room_ids == {40: _ROOM_ID}
     assert store.called == {40}
     assert len(publisher.events) == 1
 
@@ -601,3 +648,121 @@ def test_call_specific_defaults_operational_day_to_today():
     service.call_specific(1, 40, _ROOM)
 
     assert reader.list_calls[0] == date.today()
+
+
+# --- room resolution runs before any transition (Property 4) ----------------
+# **Validates: Requirements 4.3, 4.4, 4.5, 4.6, 6.4**
+
+
+def test_call_next_unknown_room_rejected_before_any_transition():
+    queue = _queue(1, [_AGENDA_A], QueuePolicy.BY_ARRIVAL)
+    # A callable head exists, proving resolution happens before selection.
+    service, _reader, repo, publisher, store = _build(
+        queue, [_candidate(40, 1, public_call_code="AAA001")]
+    )
+
+    with pytest.raises(RoomNotFoundError) as info:
+        service.call_next(1, _UNKNOWN_ROOM, _DAY)
+
+    assert info.value.room_reference == _UNKNOWN_ROOM
+    # No transition, no history, no event: try_call is never invoked.
+    assert repo.try_call_ids == []
+    assert store.called == set()
+    assert publisher.events == []
+
+
+def test_call_specific_unknown_room_rejected_before_any_transition():
+    queue = _queue(1, [_AGENDA_A], QueuePolicy.BY_ARRIVAL)
+    # A visible, callable target exists, proving resolution runs first.
+    service, _reader, repo, publisher, store = _build(
+        queue, [_candidate(40, 1, public_call_code="AAA001")]
+    )
+
+    with pytest.raises(RoomNotFoundError) as info:
+        service.call_specific(1, 40, _UNKNOWN_ROOM, _DAY)
+
+    assert info.value.room_reference == _UNKNOWN_ROOM
+    assert repo.try_call_ids == []
+    assert store.called == set()
+    assert publisher.events == []
+
+
+def test_call_next_known_room_publishes_resolved_room_reference_and_id():
+    queue = _queue(1, [_AGENDA_A], QueuePolicy.BY_ARRIVAL)
+    service, _reader, repo, publisher, store = _build(
+        queue, [_candidate(40, 1, public_call_code="AAA001")]
+    )
+
+    result = service.call_next(1, _ROOM, _DAY)
+
+    # The published event carries the resolved configured Room's reference.
+    assert result.room_reference == _ROOM
+    assert publisher.events[0].room_reference == _ROOM
+    # try_call received the resolved Room id for that reference.
+    assert repo.try_call_room_ids == [_ROOM_ID]
+    assert store.called_room_ids == {40: _ROOM_ID}
+
+
+def test_call_specific_known_room_publishes_resolved_room_reference_and_id():
+    queue = _queue(1, [_AGENDA_A], QueuePolicy.BY_ARRIVAL)
+    service, _reader, repo, publisher, store = _build(
+        queue, [_candidate(40, 1, public_call_code="AAA001")]
+    )
+
+    result = service.call_specific(1, 40, _ROOM, _DAY)
+
+    assert result.room_reference == _ROOM
+    assert publisher.events[0].room_reference == _ROOM
+    assert repo.try_call_room_ids == [_ROOM_ID]
+    assert store.called_room_ids == {40: _ROOM_ID}
+
+
+# --- exactly one event per success, none on failure (Property 6) ------------
+# **Validates: Requirements 6.1, 6.2, 6.3, 11.3**
+
+
+def test_call_next_success_publishes_exactly_one_event():
+    queue = _queue(1, [_AGENDA_A], QueuePolicy.BY_ARRIVAL)
+    service, _reader, _repo, publisher, _store = _build(
+        queue, [_candidate(40, 1, public_call_code="AAA001")]
+    )
+
+    service.call_next(1, _ROOM, _DAY)
+
+    assert len(publisher.events) == 1
+
+
+def test_call_specific_success_publishes_exactly_one_event():
+    queue = _queue(1, [_AGENDA_A], QueuePolicy.BY_ARRIVAL)
+    service, _reader, _repo, publisher, _store = _build(
+        queue, [_candidate(40, 1, public_call_code="AAA001")]
+    )
+
+    service.call_specific(1, 40, _ROOM, _DAY)
+
+    assert len(publisher.events) == 1
+
+
+def test_call_specific_miss_publishes_no_event():
+    queue = _queue(1, [_AGENDA_A], QueuePolicy.BY_ARRIVAL)
+    service, _reader, repo, publisher, store = _build(
+        queue, [_candidate(40, 1, public_call_code="AAA001")]
+    )
+    # The head races to CALLED, so try_call misses and nothing is published.
+    store.race_once.add(40)
+
+    with pytest.raises(ServiceAccessNotCallableError):
+        service.call_specific(1, 40, _ROOM, _DAY)
+
+    assert repo.try_call_ids == [40]
+    assert publisher.events == []
+
+
+def test_call_next_no_callable_candidate_publishes_no_event():
+    queue = _queue(1, [_AGENDA_A], QueuePolicy.BY_ARRIVAL)
+    service, _reader, _repo, publisher, _store = _build(queue, [])
+
+    with pytest.raises(NoPatientToCallError):
+        service.call_next(1, _ROOM, _DAY)
+
+    assert publisher.events == []
