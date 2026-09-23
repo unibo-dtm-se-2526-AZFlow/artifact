@@ -2,12 +2,12 @@
 
 Property 12 (Validates: Requirements 11.1, 11.2, 11.6, 11.7, 12.5).
 
-The WebSocket transport is deferred. These checks guard that separation: the
-domain and application core must not depend on any real-time delivery
-technology, and the display behaviour must stay reachable through the
-DisplayReadModel port without any transport. Successful calls publish only
-through the existing CallEventPublisher seam, so there is no parallel
-display-notification mechanism.
+The WebSocket transport now lives in the API and infrastructure layers only.
+These checks guard that separation: the domain and application core must not
+depend on any real-time delivery technology, and the display behaviour must
+stay reachable through the DisplayReadModel port without any transport.
+Successful calls publish only through the existing CallEventPublisher seam, so
+there is no parallel display-notification mechanism.
 
 These tests are DB-free and run in the normal (non-integration) test run.
 """
