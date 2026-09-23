@@ -5,7 +5,7 @@ They let the application services run without PostgreSQL.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Dict, List, Mapping, Optional, Tuple
 
 from AZFlow.application.ports.appointment_source import ExternalAppointmentData
@@ -14,6 +14,7 @@ from AZFlow.application.ports.check_in_repository import (
     format_public_call_code,
 )
 from AZFlow.application.ports.queue_view_reader import CandidateServiceAccess
+from AZFlow.application.transition_history import TransitionRecord
 from AZFlow.domain.agenda import Agenda, ExternalAgenda
 from AZFlow.domain.queue import Queue
 from AZFlow.domain.appointment import Appointment
@@ -53,8 +54,11 @@ class FakeCheckInRepository:
     def __init__(
         self,
         resolutions: Mapping[Tuple[str, str], ResolvedAgenda],
+        totems: Optional[Mapping[str, int]] = None,
     ) -> None:
         self._resolutions: Dict[Tuple[str, str], ResolvedAgenda] = dict(resolutions)
+        # Known Totem references map to a configured Totem id; others resolve to None.
+        self._totems: Dict[str, int] = dict(totems or {})
 
         self._next_appointment_id = 1
         # Recognize appointments by stable source-specific reference.
@@ -71,6 +75,10 @@ class FakeCheckInRepository:
         # Observability for tests.
         self.created_daily_presences = 0
         self.created_service_accesses = 0
+        # totem_id received on the create path of the last created presence.
+        self.persisted_totem_ids: List[Optional[int]] = []
+        # Initial WAITING records appended when a new ServiceAccess is created.
+        self.transition_records: List[TransitionRecord] = []
 
     def resolve_agenda(
         self,
@@ -78,6 +86,9 @@ class FakeCheckInRepository:
         external_agenda_reference: str,
     ) -> Optional[ResolvedAgenda]:
         return self._resolutions.get((external_source_code, external_agenda_reference))
+
+    def resolve_totem(self, totem_reference: str) -> Optional[int]:
+        return self._totems.get(totem_reference)
 
     def find_or_create_appointment(
         self,
@@ -116,12 +127,16 @@ class FakeCheckInRepository:
         patient_identifier: PatientIdentifier,
         operational_day: date,
         ticket_master: TicketMaster,
+        totem_id: Optional[int] = None,
     ) -> DailyPresence:
         key = self._daily_presence_key(operational_day, patient_identifier)
         existing = self._daily_presences.get(key)
         if existing is not None:
             # Reload on duplicate instead of surfacing a conflict.
             return existing
+
+        # Record the origin persisted on the newly created presence.
+        self.persisted_totem_ids.append(totem_id)
 
         sequence_key = (ticket_master.id, operational_day)
         sequence = self._sequences.get(sequence_key, 0) + 1
@@ -160,6 +175,15 @@ class FakeCheckInRepository:
         self._next_service_access_id += 1
         self._service_accesses[key] = service_access
         self.created_service_accesses += 1
+        # A new ServiceAccess records the initial WAITING transition; reuse none.
+        self.transition_records.append(
+            TransitionRecord(
+                service_access_id=service_access.id,
+                previous_state=None,
+                resulting_state=ServiceAccessState.WAITING,
+                occurred_at=datetime.now(),
+            )
+        )
         return service_access
 
     def service_accesses(self) -> List[ServiceAccess]:
