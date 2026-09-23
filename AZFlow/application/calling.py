@@ -19,6 +19,7 @@ from AZFlow.application.errors import (
     NoPatientToCallError,
     QueueInactiveError,
     QueueNotFoundError,
+    RoomNotFoundError,
     ServiceAccessNotCallableError,
     ServiceAccessNotVisibleError,
 )
@@ -76,11 +77,13 @@ class CallingService:
             MissingRoomReferenceError: the Room reference is missing or blank.
             QueueNotFoundError: no Queue exists for the id.
             QueueInactiveError: the Queue is INACTIVE.
+            RoomNotFoundError: the Room reference is not a configured Room.
             NoPatientToCallError: no callable ServiceAccess is available.
             MissingPublicCallCodeError: the selected head has no call code.
         """
         self._require_room_reference(room_reference)
         queue = self._load_active_queue(queue_id)
+        room_id = self._resolve_room(room_reference)
         day = date.today() if operational_day is None else operational_day
         served_agenda_ids = [agenda.id for agenda in queue.agendas]
 
@@ -98,7 +101,7 @@ class CallingService:
                 head.public_call_code, head.service_access_id
             )
 
-            called = self._call_repository.try_call(head.service_access_id)
+            called = self._call_repository.try_call(head.service_access_id, room_id)
             if called is None:
                 # The head raced to CALLED; try the next current head.
                 continue
@@ -119,12 +122,14 @@ class CallingService:
             MissingRoomReferenceError: the Room reference is missing or blank.
             QueueNotFoundError: no Queue exists for the id.
             QueueInactiveError: the Queue is INACTIVE.
+            RoomNotFoundError: the Room reference is not a configured Room.
             ServiceAccessNotVisibleError: the target is not visible in the Queue.
             ServiceAccessNotCallableError: the target is visible but not WAITING.
             MissingPublicCallCodeError: the target has no call code.
         """
         self._require_room_reference(room_reference)
         queue = self._load_active_queue(queue_id)
+        room_id = self._resolve_room(room_reference)
         day = date.today() if operational_day is None else operational_day
         served_agenda_ids = [agenda.id for agenda in queue.agendas]
 
@@ -137,7 +142,7 @@ class CallingService:
 
         self._require_public_call_code(target.public_call_code, service_access_id)
 
-        called = self._call_repository.try_call(service_access_id)
+        called = self._call_repository.try_call(service_access_id, room_id)
         if called is None:
             raise ServiceAccessNotCallableError(service_access_id)
         return self._succeed(target.public_call_code, called, room_reference)
@@ -156,6 +161,17 @@ class CallingService:
         if not queue.is_active():
             raise QueueInactiveError(queue_id)
         return queue
+
+    def _resolve_room(self, room_reference: str) -> int:
+        """Resolve the Room reference to a configured Room id before any call.
+
+        Runs before any transition, so an unknown Room causes no transition,
+        no history record and no CallEvent.
+        """
+        room_id = self._call_repository.resolve_room(room_reference)
+        if room_id is None:
+            raise RoomNotFoundError(room_reference)
+        return room_id
 
     @staticmethod
     def _require_public_call_code(
