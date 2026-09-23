@@ -64,6 +64,10 @@ class CheckInRepository(Protocol):
         """Return the configured agenda and its active queues, if found"""
         ...
 
+    def resolve_totem(self, totem_reference: str) -> Optional[int]:
+        """Return the configured Totem id for a reference, or None when unknown"""
+        ...
+
     def find_or_create_appointment(
         self,
         data: ExternalAppointmentData,
@@ -86,9 +90,11 @@ class CheckInRepository(Protocol):
         patient_identifier: PatientIdentifier,
         operational_day: date,
         ticket_master: TicketMaster,
+        totem_id: Optional[int] = None,
     ) -> DailyPresence:
         """Create a daily presence with the next public call code
 
+        The optional originating Totem id is persisted on the new presence.
         A concurrent request for the same patient and day returns the existing
         presence.
         """
@@ -100,5 +106,9 @@ class CheckInRepository(Protocol):
         agenda: Agenda,
         appointment: Appointment,
     ) -> ServiceAccess:
-        """Create or reuse a service access for an appointment"""
+        """Create or reuse a service access for an appointment
+
+        Creating a new service access also records the initial WAITING
+        transition in the same transaction. Idempotent reuse records none.
+        """
         ...
