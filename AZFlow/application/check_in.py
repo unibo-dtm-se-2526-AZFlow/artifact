@@ -63,14 +63,16 @@ class CheckInService:
     def check_in(
         self,
         patient_identifier: PatientIdentifier,
-        totem_reference: Optional[str] = None,
         operational_day: Optional[date] = None,
+        totem_reference: Optional[str] = None,
     ) -> CheckInResult:
         """Check in a patient for an operational day
 
-        The current day is used when ``operational_day`` is not provided.
-        When ``totem_reference`` is given, it records the check-in origin; the
-        origin stays unknown otherwise.
+        ``operational_day`` stays the second positional parameter to preserve
+        the original contract, so existing positional callers are unaffected.
+        The current day is used when it is not provided. When
+        ``totem_reference`` is given, it records the check-in origin; the origin
+        stays unknown otherwise.
 
         Raises:
             UnsupportedIdentifierTypeError: the identifier type is not supported
