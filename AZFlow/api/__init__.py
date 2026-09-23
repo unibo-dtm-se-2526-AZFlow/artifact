@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from AZFlow.api.composition import (
     wire_calling,
     wire_check_in,
+    wire_display_read_model,
     wire_queue_view,
     wire_state_management,
 )
@@ -19,6 +20,7 @@ def create_app() -> FastAPI:
     wire_queue_view(application)
     wire_calling(application)
     wire_state_management(application)
+    wire_display_read_model(application)
     return application
 
 

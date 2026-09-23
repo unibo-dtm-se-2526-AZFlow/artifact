@@ -13,11 +13,13 @@ from fastapi import FastAPI, HTTPException, status
 
 from AZFlow.api.v1.calling import get_calling_service
 from AZFlow.api.v1.check_in import get_check_in_service
+from AZFlow.api.v1.displays import get_display_read_model
 from AZFlow.api.v1.queue_view import get_queue_view_service
 from AZFlow.api.v1.state_management import get_state_management_service
 from AZFlow.application.calling import CallingService
 from AZFlow.application.check_in import CheckInService
 from AZFlow.application.ports.call_event_publisher import CallEventPublisher
+from AZFlow.application.ports.display_read_model import DisplayReadModel
 from AZFlow.application.queue_view import QueueViewService
 from AZFlow.application.state_management import StateManagementService
 from AZFlow.infrastructure.appointment_sources.mock import MockAppointmentSource
@@ -30,6 +32,9 @@ from AZFlow.infrastructure.persistence.postgres_call_repository import (
 )
 from AZFlow.infrastructure.persistence.postgres_check_in_repository import (
     PostgresCheckInRepository,
+)
+from AZFlow.infrastructure.persistence.postgres_display_read_model import (
+    PostgresDisplayReadModel,
 )
 from AZFlow.infrastructure.persistence.postgres_queue_view_reader import (
     PostgresQueueViewReader,
@@ -111,6 +116,45 @@ def wire_queue_view(application: FastAPI) -> None:
     settings = load_settings()
     application.dependency_overrides[get_queue_view_service] = (
         build_queue_view_service_provider(settings.database_url)
+    )
+
+
+def build_display_read_model_provider(
+    database_url: object,
+    recent_calls_max: int,
+) -> Callable[[], Iterator[DisplayReadModel]]:
+    """Build the DisplayReadModel dependency used for each request
+
+    Each request gets a new PostgreSQL connection. The recent-calls bound comes
+    from configuration. A missing database URL returns HTTP 503.
+    """
+
+    def provide_display_read_model() -> Iterator[DisplayReadModel]:
+        if not database_url:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="display read model is not configured",
+            )
+
+        # Import here so application startup does not open a connection
+        import psycopg
+
+        with psycopg.connect(str(database_url)) as connection:
+            yield PostgresDisplayReadModel(connection, recent_calls_max)
+
+    return provide_display_read_model
+
+
+def wire_display_read_model(application: FastAPI) -> None:
+    """Connect the display read model to the FastAPI application
+
+    Tests can replace this dependency with a fake read model.
+    """
+    settings = load_settings()
+    application.dependency_overrides[get_display_read_model] = (
+        build_display_read_model_provider(
+            settings.database_url, settings.display_recent_calls_max
+        )
     )
 
 

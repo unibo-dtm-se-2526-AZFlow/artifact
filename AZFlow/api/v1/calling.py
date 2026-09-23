@@ -17,6 +17,7 @@ from AZFlow.application.errors import (
     NoPatientToCallError,
     QueueInactiveError,
     QueueNotFoundError,
+    RoomNotFoundError,
     ServiceAccessNotCallableError,
     ServiceAccessNotVisibleError,
 )
@@ -77,6 +78,11 @@ def call_next(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="room reference is required",
         ) from error
+    except RoomNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="room is not configured",
+        ) from error
     except QueueNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -122,6 +128,11 @@ def call_specific(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="room reference is required",
+        ) from error
+    except RoomNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="room is not configured",
         ) from error
     except QueueNotFoundError as error:
         raise HTTPException(
