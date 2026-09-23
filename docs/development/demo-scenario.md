@@ -121,14 +121,77 @@ After calling a Patient, keep the `service_access_id` returned by the call and c
 CALLED_SERVICE_ACCESS_ID=<id>
 
 curl -s -X POST \
-  "http://localhost:8000/api/v1/service-accesses/$CALLED_SERVICE_ACCESS_ID/admission" \
+  "http://localhost:8000/api/v1/service-accesses/$CALLED_SERVICE_ACCESS_ID/admission"
+~~~
+
+The response should report `state: "ADMITTED"` together with the persisted Room reference and label selected at call time. Admission does not accept a new Room: the Room associated with the successful call is reused.
+
+An ADMITTED ServiceAccess stays outside Queue views and cannot be called again. Confirming admission for a ServiceAccess that is not CALLED returns a conflict.
+
+## Call notifications and displays
+
+The development topology contains:
+
+- `ROOM-1` ("Room 1") in the Radiotherapy branch;
+- `ROOM-2` ("Room 2") in the Oncology branch;
+- RoomMonitor `1`, associated with `ROOM-1`;
+- WaitingRoomMonitor `1`, scoped to Radiotherapy and its descendant LocationNodes.
+
+The waiting-room monitor therefore receives calls for `ROOM-1`, but not for `ROOM-2`.
+
+Open a terminal and connect to WaitingRoomMonitor 1:
+
+~~~bash
+poetry run python - <<'PY'
+import asyncio
+import websockets
+
+async def main():
+    async with websockets.connect(
+        "ws://localhost:8000/api/v1/ws/waiting-room-monitors/1"
+    ) as ws:
+        while True:
+            print(await ws.recv())
+
+asyncio.run(main())
+PY
+~~~
+
+Open another terminal to observe the RoomMonitor:
+
+~~~bash
+poetry run python - <<'PY'
+import asyncio
+import websockets
+
+async def main():
+    async with websockets.connect(
+        "ws://localhost:8000/api/v1/ws/room-monitors/1"
+    ) as ws:
+        while True:
+            print(await ws.recv())
+
+asyncio.run(main())
+PY
+~~~
+
+Each connection first receives a `snapshot` built from persisted call history. The WaitingRoomMonitor snapshot contains the bounded recent calls in its configured scope; the RoomMonitor snapshot contains at most the latest call for `ROOM-1`.
+
+Leave both clients connected and call a WAITING ServiceAccess to `ROOM-1`:
+
+~~~bash
+curl -s -X POST http://localhost:8000/api/v1/queues/1/calls/next \
   -H 'Content-Type: application/json' \
   -d '{"room_reference":"ROOM-1"}'
 ~~~
 
-The response should report `state: "ADMITTED"` and echo the same Room reference. The Room reference is operational context supplied by the client; AZFlow does not persist it or compare it with the Room used for the earlier call.
+Both connected clients should receive a live `call` message. It contains only display-safe data: public call code, Agenda, state, Room reference and label, and the persisted call-transition timestamp. It contains no Patient identifier.
 
-An ADMITTED ServiceAccess stays outside Queue views and cannot be called again. Confirming admission for a ServiceAccess that is not CALLED returns a conflict.
+A call to `ROOM-2` is outside WaitingRoomMonitor 1's Radiotherapy scope and there is no configured RoomMonitor for `ROOM-2`, so neither of the two clients above receives that call.
+
+An unknown monitor id is rejected by the WebSocket endpoint. Suspend, restore and admission do not produce display notifications.
+
+If a display reconnects, its initial snapshot is rebuilt from persisted history and topology, so it does not depend on having received earlier live messages.
 
 ## Extending the scenario
 
