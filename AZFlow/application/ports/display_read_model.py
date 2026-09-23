@@ -57,3 +57,33 @@ class DisplayReadModel(Protocol):
         when there is none.
         """
         ...
+
+    def waiting_room_monitor_exists(self, waiting_room_monitor_id: int) -> bool:
+        """Return whether a WaitingRoomMonitor with this id is configured.
+
+        This is a plain configuration check, independent of whether the monitor
+        currently has any calls. A configured monitor with an empty snapshot
+        still exists.
+        """
+        ...
+
+    def room_monitor_exists(self, room_monitor_id: int) -> bool:
+        """Return whether a RoomMonitor with this id is configured.
+
+        This is a plain configuration check, independent of whether the
+        monitor's Room currently has any calls.
+        """
+        ...
+
+    def waiting_room_monitor_ids_for_room(self, room_reference: str) -> List[int]:
+        """Return the WaitingRoomMonitors whose scope covers a Room.
+
+        A monitor covers the Room when one of its scope nodes is the Room's
+        LocationNode or an ancestor of it. The descendant rule stays in the
+        persisted topology, not in the caller.
+        """
+        ...
+
+    def room_monitor_ids_for_room(self, room_reference: str) -> List[int]:
+        """Return the RoomMonitors bound to a Room."""
+        ...
