@@ -77,7 +77,7 @@ from tests.infrastructure.persistence.seed import (
 )
 
 _IDENTIFIER_VALUE = "RSSMRA80A01H501U"
-_IDENTIFIER_VALUE_2 = "VRDLGI85B02H502V"
+_IDENTIFIER_VALUE_2 = "DEV0002"  # a mock identifier with an AGENDA-A appointment
 _ROOM_1 = "ROOM-1"
 _ROOM_2 = "ROOM-2"
 _ALLOWED_FIELDS = {
@@ -197,6 +197,19 @@ def _call_next(
     return response.json()
 
 
+def _first_waiting_id(connection, exclude: int) -> int:
+    """Return a WAITING service access id other than ``exclude``."""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT id FROM service_access "
+            "WHERE state = 'WAITING' AND id <> %s ORDER BY id LIMIT 1",
+            (exclude,),
+        )
+        row = cursor.fetchone()
+    assert row is not None, "expected a remaining WAITING service access"
+    return row[0]
+
+
 def _assert_non_identifying(call: dict) -> None:
     assert set(call.keys()) == _ALLOWED_FIELDS
     assert _IDENTIFIER_VALUE not in str(call)
@@ -303,7 +316,8 @@ def test_live_call_reaches_in_scope_and_not_out_of_scope(wired_client):
         _assert_non_identifying(room_msg["call"])
 
         # A second Patient is called into ROOM-2, which the Oncology monitor
-        # covers. Its first live message must be that ROOM-2 call.
+        # covers. Its first live message must be that ROOM-2 call, proving the
+        # earlier ROOM-1 call was never delivered to it.
         _check_in(wired_client, _IDENTIFIER_VALUE_2)
         oncology_body = _call_next(wired_client, seeded.queue_id, _ROOM_2)
         out_msg = out_of_scope.receive_json()
@@ -340,35 +354,32 @@ def test_multiple_clients_on_one_monitor_each_receive(wired_client):
 # Property 2 - suspend and restore send nothing.
 
 
-def test_suspend_restore_send_no_message(wired_client):
+def test_suspend_restore_send_no_message(wired_client, connection):
     """Suspend and restore produce no WS message.
 
-    After suspend and restore of the first call, a second real call to the same
-    Room is issued. The room monitor's first live message must be that second
-    call: any message emitted by suspend or restore would have arrived first.
+    The first Patient has two accesses; one is called into ROOM-1 and the other
+    stays WAITING. That WAITING access is suspended then restored (neither
+    publishes). A later real call into ROOM-1 is the room monitor's first live
+    message, proving suspend and restore sent nothing in between.
     """
     _check_in(wired_client)
     seeded = wired_client.seeded
     body = _call_next(wired_client, seeded.queue_id, _ROOM_1)
-    service_access_id = body["service_access_id"]
+    called_id = body["service_access_id"]
+    waiting_id = _first_waiting_id(connection, exclude=called_id)
 
     with wired_client.websocket_connect(
         f"/api/v1/ws/room-monitors/{seeded.room_monitor_id}"
     ) as room:
         assert room.receive_json()["type"] == "snapshot"
 
-        suspend = wired_client.post(
-            f"/api/v1/service-accesses/{service_access_id}/suspend"
-        )
+        suspend = wired_client.post(f"/api/v1/service-accesses/{waiting_id}/suspend")
         assert suspend.status_code == 200
-        restore = wired_client.post(
-            f"/api/v1/service-accesses/{service_access_id}/restore"
-        )
+        restore = wired_client.post(f"/api/v1/service-accesses/{waiting_id}/restore")
         assert restore.status_code == 200
 
-        # A second Patient is called into the same Room; its call is the room
+        # The restored access is called into ROOM-1; its call is the room
         # monitor's first live message, proving suspend and restore sent nothing.
-        _check_in(wired_client, _IDENTIFIER_VALUE_2)
         second = _call_next(wired_client, seeded.queue_id, _ROOM_1)
         message = room.receive_json()
         assert message["type"] == "call"
