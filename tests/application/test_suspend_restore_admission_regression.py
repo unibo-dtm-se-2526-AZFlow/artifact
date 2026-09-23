@@ -139,7 +139,7 @@ class _CallingStore:
     def all_candidates(self) -> List[CandidateServiceAccess]:
         return list(self.candidates.values())
 
-    def try_call(self, service_access_id: int) -> Optional[ServiceAccess]:
+    def try_call(self, service_access_id: int, room_id: int) -> Optional[ServiceAccess]:
         candidate = self.candidates.get(service_access_id)
         if candidate is None:
             return None
@@ -181,13 +181,20 @@ class _CallingReader:
 
 
 class _CallRepository:
-    """CallRepository fake sharing the store with the reader."""
+    """CallRepository fake sharing the store with the reader.
+
+    ``resolve_room`` resolves the demo Room reference these tests call with; the
+    resolved id flows into ``try_call`` like the real adapter.
+    """
 
     def __init__(self, store: _CallingStore) -> None:
         self._store = store
 
-    def try_call(self, service_access_id: int) -> Optional[ServiceAccess]:
-        return self._store.try_call(service_access_id)
+    def resolve_room(self, room_reference: str) -> Optional[int]:
+        return 3 if room_reference == _ROOM else None
+
+    def try_call(self, service_access_id: int, room_id: int) -> Optional[ServiceAccess]:
+        return self._store.try_call(service_access_id, room_id)
 
 
 class _RecordingPublisher:

@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,7 +7,6 @@ from AZFlow.api import app
 from AZFlow.api.v1.state_management import get_state_management_service
 from AZFlow.application.errors import (
     ApplicationError,
-    MissingRoomReferenceError,
     ServiceAccessNotAdmittableError,
     ServiceAccessNotFoundError,
     ServiceAccessNotRestorableError,
@@ -20,9 +19,14 @@ from AZFlow.domain.service_access import ServiceAccessState
 _AGENDA = Agenda(id=3, name="Cardiology")
 
 
+_ROOM_REFERENCE = "ROOM-1"
+_ROOM_LABEL = "Room 1"
+
+
 def _result(
     state: ServiceAccessState,
     room_reference: Optional[str] = None,
+    room_label: Optional[str] = None,
 ) -> StateChangeResult:
     """A non-identifying successful state-change result."""
     return StateChangeResult(
@@ -31,6 +35,7 @@ def _result(
         agenda=_AGENDA,
         state=state,
         room_reference=room_reference,
+        room_label=room_label,
     )
 
 
@@ -46,7 +51,7 @@ class FakeStateManagementService:
         self._error = error
         self.suspend_calls: List[int] = []
         self.restore_calls: List[int] = []
-        self.admission_calls: List[Tuple[int, str]] = []
+        self.admission_calls: List[int] = []
 
     def suspend(self, service_access_id: int) -> StateChangeResult:
         self.suspend_calls.append(service_access_id)
@@ -60,15 +65,15 @@ class FakeStateManagementService:
             raise self._error
         return _result(ServiceAccessState.WAITING)
 
-    def confirm_admission(
-        self,
-        service_access_id: int,
-        room_reference: str,
-    ) -> StateChangeResult:
-        self.admission_calls.append((service_access_id, room_reference))
+    def confirm_admission(self, service_access_id: int) -> StateChangeResult:
+        self.admission_calls.append(service_access_id)
         if self._error is not None:
             raise self._error
-        return _result(ServiceAccessState.ADMITTED, room_reference)
+        return _result(
+            ServiceAccessState.ADMITTED,
+            room_reference=_ROOM_REFERENCE,
+            room_label=_ROOM_LABEL,
+        )
 
 
 @pytest.fixture
@@ -124,32 +129,45 @@ def test_restore_success_returns_2xx_and_non_identifying_shape(client):
     assert service.restore_calls == [12]
 
 
-def test_admission_success_returns_2xx_with_state_and_room_reference(client):
+def test_admission_success_returns_2xx_with_state_and_room(client):
     service = FakeStateManagementService()
     _override(service)
 
-    response = client.post(_ADMISSION_PATH, json={"room_reference": "ROOM-3"})
+    response = client.post(_ADMISSION_PATH)
 
     assert 200 <= response.status_code < 300
     body = response.json()
+    assert set(body.keys()) == {
+        "public_call_code",
+        "service_access_id",
+        "agenda",
+        "state",
+        "room_reference",
+        "room_label",
+    }
     assert body["public_call_code"] == "AAA001"
     assert body["service_access_id"] == 12
     assert body["agenda"] == {"id": 3, "name": "Cardiology"}
     assert body["state"] == "ADMITTED"
-    # Admission carries the Room reference unchanged.
-    assert body["room_reference"] == "ROOM-3"
-    assert service.admission_calls == [(12, "ROOM-3")]
+    # Admission exposes the non-identifying Room reference and label.
+    assert body["room_reference"] == _ROOM_REFERENCE
+    assert body["room_label"] == _ROOM_LABEL
+    assert service.admission_calls == [12]
 
 
-def test_admission_carries_room_reference_into_the_service(client):
+def test_admission_uses_only_the_service_access_id(client):
     service = FakeStateManagementService()
     _override(service)
 
-    response = client.post(_ADMISSION_PATH, json={"room_reference": "ROOM-7"})
+    response = client.post(_ADMISSION_PATH)
 
     assert response.status_code == 200
-    assert service.admission_calls == [(12, "ROOM-7")]
-    assert response.json()["room_reference"] == "ROOM-7"
+    assert service.admission_calls == [12]
+    body = response.json()
+    assert body["state"] == "ADMITTED"
+    # The admission takes no room input, but exposes the persisted Room data.
+    assert body["room_reference"] == _ROOM_REFERENCE
+    assert body["room_label"] == _ROOM_LABEL
 
 
 # --- Privacy ---------------------------------------------------------------
@@ -170,13 +188,14 @@ def test_admission_carries_room_reference_into_the_service(client):
         ),
         (
             _ADMISSION_PATH,
-            {"room_reference": "ROOM-3"},
+            None,
             {
                 "public_call_code",
                 "service_access_id",
                 "agenda",
                 "state",
                 "room_reference",
+                "room_label",
             },
         ),
     ],
@@ -271,7 +290,6 @@ def test_restore_not_found_is_distinct_from_not_restorable(client):
 @pytest.mark.parametrize(
     ("error", "expected_status"),
     [
-        (MissingRoomReferenceError(), 422),
         (ServiceAccessNotFoundError(12), 404),
         (ServiceAccessNotAdmittableError(12), 409),
     ],
@@ -279,49 +297,35 @@ def test_restore_not_found_is_distinct_from_not_restorable(client):
 def test_admission_error_maps_to_distinguishable_status(client, error, expected_status):
     _override(FakeStateManagementService(error=error))
 
-    response = client.post(_ADMISSION_PATH, json={"room_reference": "ROOM-3"})
+    response = client.post(_ADMISSION_PATH)
 
     assert response.status_code == expected_status
     detail = response.json()["detail"]
     assert isinstance(detail, str)
 
 
-def test_admission_missing_room_not_found_and_not_admittable_are_distinct(client):
-    _override(FakeStateManagementService(error=MissingRoomReferenceError()))
-    missing_room = client.post(_ADMISSION_PATH, json={"room_reference": "   "})
-    app.dependency_overrides.clear()
-
+def test_admission_not_found_and_not_admittable_are_distinct(client):
     _override(FakeStateManagementService(error=ServiceAccessNotFoundError(12)))
-    not_found = client.post(_ADMISSION_PATH, json={"room_reference": "ROOM-3"})
+    not_found = client.post(_ADMISSION_PATH)
     app.dependency_overrides.clear()
 
     _override(FakeStateManagementService(error=ServiceAccessNotAdmittableError(12)))
-    not_admittable = client.post(_ADMISSION_PATH, json={"room_reference": "ROOM-3"})
+    not_admittable = client.post(_ADMISSION_PATH)
 
-    assert missing_room.status_code == 422
     assert not_found.status_code == 404
     assert not_admittable.status_code == 409
-    assert (
-        len(
-            {
-                missing_room.status_code,
-                not_found.status_code,
-                not_admittable.status_code,
-            }
-        )
-        == 3
-    )
+    assert not_found.status_code != not_admittable.status_code
 
 
-def test_admission_missing_body_is_client_error_before_service(client):
+def test_admission_without_body_reaches_the_service(client):
     service = FakeStateManagementService()
     _override(service)
 
     response = client.post(_ADMISSION_PATH)
 
-    # A missing request body fails Pydantic validation, before the service.
-    assert response.status_code == 422
-    assert service.admission_calls == []
+    # Admission takes no request body, so the call reaches the service.
+    assert response.status_code == 200
+    assert service.admission_calls == [12]
 
 
 # --- Path id validation ----------------------------------------------------
@@ -361,10 +365,7 @@ def test_admission_invalid_path_id_is_client_error_before_service(
     service = FakeStateManagementService()
     _override(service)
 
-    response = client.post(
-        f"/api/v1/service-accesses/{service_access_id}/admission",
-        json={"room_reference": "ROOM-3"},
-    )
+    response = client.post(f"/api/v1/service-accesses/{service_access_id}/admission")
 
     assert response.status_code == 422
     assert service.admission_calls == []

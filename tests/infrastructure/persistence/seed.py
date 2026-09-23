@@ -97,3 +97,97 @@ def seed_queue(
             )
     conn.commit()  # type: ignore[attr-defined]
     return queue_id
+
+
+def seed_location_node(
+    conn: "object", label: str, parent_id: "int | None" = None
+) -> int:
+    with conn.cursor() as cursor:  # type: ignore[attr-defined]
+        cursor.execute(
+            "INSERT INTO location_node (parent_id, label) VALUES (%s, %s) RETURNING id",
+            (parent_id, label),
+        )
+        location_node_id = cursor.fetchone()[0]
+    conn.commit()  # type: ignore[attr-defined]
+    return location_node_id
+
+
+def seed_room(
+    conn: "object", location_node_id: int, room_reference: str, label: str
+) -> int:
+    with conn.cursor() as cursor:  # type: ignore[attr-defined]
+        cursor.execute(
+            """
+            INSERT INTO room (room_reference, label, location_node_id)
+            VALUES (%s, %s, %s)
+            RETURNING id
+            """,
+            (room_reference, label, location_node_id),
+        )
+        room_id = cursor.fetchone()[0]
+    conn.commit()  # type: ignore[attr-defined]
+    return room_id
+
+
+def seed_room_workstation(conn: "object", room_id: int) -> int:
+    with conn.cursor() as cursor:  # type: ignore[attr-defined]
+        cursor.execute(
+            "INSERT INTO room_workstation (room_id) VALUES (%s) RETURNING id",
+            (room_id,),
+        )
+        workstation_id = cursor.fetchone()[0]
+    conn.commit()  # type: ignore[attr-defined]
+    return workstation_id
+
+
+def seed_room_monitor(conn: "object", room_id: int) -> int:
+    with conn.cursor() as cursor:  # type: ignore[attr-defined]
+        cursor.execute(
+            "INSERT INTO room_monitor (room_id) VALUES (%s) RETURNING id",
+            (room_id,),
+        )
+        monitor_id = cursor.fetchone()[0]
+    conn.commit()  # type: ignore[attr-defined]
+    return monitor_id
+
+
+def seed_waiting_room_monitor(conn: "object", label: str) -> int:
+    with conn.cursor() as cursor:  # type: ignore[attr-defined]
+        cursor.execute(
+            "INSERT INTO waiting_room_monitor (label) VALUES (%s) RETURNING id",
+            (label,),
+        )
+        monitor_id = cursor.fetchone()[0]
+    conn.commit()  # type: ignore[attr-defined]
+    return monitor_id
+
+
+def seed_waiting_room_monitor_scope(
+    conn: "object", waiting_room_monitor_id: int, location_node_id: int
+) -> None:
+    with conn.cursor() as cursor:  # type: ignore[attr-defined]
+        cursor.execute(
+            """
+            INSERT INTO waiting_room_monitor_scope (
+                waiting_room_monitor_id, location_node_id
+            )
+            VALUES (%s, %s)
+            """,
+            (waiting_room_monitor_id, location_node_id),
+        )
+    conn.commit()  # type: ignore[attr-defined]
+
+
+def seed_totem(conn: "object", location_node_id: int, external_reference: str) -> int:
+    with conn.cursor() as cursor:  # type: ignore[attr-defined]
+        cursor.execute(
+            """
+            INSERT INTO totem (external_reference, location_node_id)
+            VALUES (%s, %s)
+            RETURNING id
+            """,
+            (external_reference, location_node_id),
+        )
+        totem_id = cursor.fetchone()[0]
+    conn.commit()  # type: ignore[attr-defined]
+    return totem_id

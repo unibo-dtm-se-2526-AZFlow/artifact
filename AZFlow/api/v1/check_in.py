@@ -6,11 +6,14 @@ errors to HTTP responses. Error messages never include the patient identifier.
 
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from AZFlow.application.check_in import CheckInService
 from AZFlow.application.errors import (
+    InvalidTotemReferenceError,
     NoAppointmentAvailableError,
     UnsupportedIdentifierTypeError,
 )
@@ -26,6 +29,7 @@ class CheckInRequest(BaseModel):
 
     identifier_type: str = Field(min_length=1)
     identifier_value: str = Field(min_length=1)
+    totem_reference: Optional[str] = None
 
 
 class CheckInResponse(BaseModel):
@@ -67,12 +71,23 @@ def check_in(
         ) from error
 
     try:
-        result = service.check_in(patient_identifier)
+        if request.totem_reference is not None:
+            result = service.check_in(
+                patient_identifier, totem_reference=request.totem_reference
+            )
+        else:
+            result = service.check_in(patient_identifier)
     except UnsupportedIdentifierTypeError as error:
         # Return the unsupported type but never the identifier value
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(f"unsupported patient identifier type: {error.identifier_type!r}"),
+        ) from error
+    except InvalidTotemReferenceError as error:
+        # Keep the message generic so no identifying data can leak.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="totem reference is not configured",
         ) from error
     except NoAppointmentAvailableError as error:
         raise HTTPException(

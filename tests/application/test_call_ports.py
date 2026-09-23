@@ -86,14 +86,22 @@ def test_any_object_matching_the_protocol_is_a_call_repository():
     service_access = _service_access()
 
     class InMemoryCallRepository:
-        def try_call(self, service_access_id: int) -> Optional[ServiceAccess]:
+        def resolve_room(self, room_reference: str) -> Optional[int]:
+            return 3 if room_reference == "ROOM-3" else None
+
+        def try_call(
+            self, service_access_id: int, room_id: int
+        ) -> Optional[ServiceAccess]:
             if service_access_id == service_access.id:
                 return service_access.called()
             return None
 
     repository: CallRepository = InMemoryCallRepository()
 
-    called = repository.try_call(12)
+    assert repository.resolve_room("ROOM-3") == 3
+    assert repository.resolve_room("NO-SUCH-ROOM") is None
+
+    called = repository.try_call(12, 3)
     assert called is not None
     assert called.state is ServiceAccessState.CALLED
-    assert repository.try_call(999) is None
+    assert repository.try_call(999, 3) is None

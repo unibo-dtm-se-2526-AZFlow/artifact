@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_API_HOST = "0.0.0.0"
 DEFAULT_API_PORT = 8000
+DEFAULT_DISPLAY_RECENT_CALLS_MAX = 10
 
 
 class Settings(BaseSettings):
@@ -21,6 +22,7 @@ class Settings(BaseSettings):
     api_host: str = DEFAULT_API_HOST
     api_port: int = DEFAULT_API_PORT
     database_url: Optional[str] = None
+    display_recent_calls_max: int = DEFAULT_DISPLAY_RECENT_CALLS_MAX
 
 
 def load_settings() -> Settings:

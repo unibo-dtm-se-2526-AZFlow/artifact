@@ -11,6 +11,7 @@ from datetime import date
 from typing import List, Optional, Sequence, Tuple
 
 from AZFlow.application.errors import (
+    InvalidTotemReferenceError,
     NoAppointmentAvailableError,
     UnsupportedIdentifierTypeError,
 )
@@ -63,18 +64,27 @@ class CheckInService:
         self,
         patient_identifier: PatientIdentifier,
         operational_day: Optional[date] = None,
+        totem_reference: Optional[str] = None,
     ) -> CheckInResult:
         """Check in a patient for an operational day
 
-        The current day is used when ``operational_day`` is not provided.
+        ``operational_day`` stays the second positional parameter to preserve
+        the original contract, so existing positional callers are unaffected.
+        The current day is used when it is not provided. When
+        ``totem_reference`` is given, it records the check-in origin; the origin
+        stays unknown otherwise.
 
         Raises:
             UnsupportedIdentifierTypeError: the identifier type is not supported
+            InvalidTotemReferenceError: the Totem reference is unknown
             NoAppointmentAvailableError: no valid appointment is available
         """
         self._require_supported_type(patient_identifier)
 
         day = date.today() if operational_day is None else operational_day
+
+        # Reject an unknown Totem before creating any check-in data
+        totem_id = self._resolve_totem(totem_reference)
 
         relevant = self._collect_relevant(patient_identifier, day)
         if not relevant:
@@ -95,7 +105,7 @@ class CheckInService:
         ]
 
         daily_presence = self._find_or_create_daily_presence(
-            patient_identifier, day, imported
+            patient_identifier, day, imported, totem_id
         )
 
         # Create missing service accesses without duplicates
@@ -107,6 +117,15 @@ class CheckInService:
             )
 
         return CheckInResult(daily_presence=daily_presence)
+
+    def _resolve_totem(self, totem_reference: Optional[str]) -> Optional[int]:
+        """Resolve the optional check-in origin, rejecting an unknown Totem"""
+        if totem_reference is None:
+            return None
+        totem_id = self._repository.resolve_totem(totem_reference)
+        if totem_id is None:
+            raise InvalidTotemReferenceError(totem_reference)
+        return totem_id
 
     @staticmethod
     def _require_supported_type(patient_identifier: PatientIdentifier) -> None:
@@ -139,10 +158,12 @@ class CheckInService:
         patient_identifier: PatientIdentifier,
         operational_day: date,
         imported: List[Tuple[Appointment, ResolvedAgenda]],
+        totem_id: Optional[int] = None,
     ) -> DailyPresence:
         """Reuse a daily presence or create one with a new call code
 
         The earliest appointment selects the TicketMaster for a new presence.
+        The Totem origin is persisted only when a new presence is created.
         """
         existing = self._repository.find_daily_presence(
             operational_day, patient_identifier
@@ -163,4 +184,5 @@ class CheckInService:
             patient_identifier,
             operational_day,
             ticket_master,
+            totem_id=totem_id,
         )

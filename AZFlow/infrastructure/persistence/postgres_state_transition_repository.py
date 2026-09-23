@@ -12,6 +12,7 @@ from typing import Optional
 
 import psycopg
 
+from AZFlow.application.ports.state_transition_repository import AdmissionOutcome
 from AZFlow.domain.service_access import ServiceAccess, ServiceAccessState
 from AZFlow.infrastructure.persistence.service_access_loader import (
     load_agenda,
@@ -52,16 +53,77 @@ class PostgresStateTransitionRepository:
             ServiceAccessState.WAITING,
         )
 
-    def try_admit(self, service_access_id: int) -> Optional[ServiceAccess]:
+    def try_admit(self, service_access_id: int) -> Optional[AdmissionOutcome]:
         """Try the CALLED to ADMITTED transition of one ServiceAccess.
 
-        Return the transitioned ServiceAccess, or None when it was no longer
-        CALLED.
+        Reuses the room_id stored at call time. On a hit it also reads that
+        Room's reference and label in the same transaction and returns them in
+        an AdmissionOutcome. Return None when it was no longer CALLED.
         """
-        return self._try_transition(
-            service_access_id,
-            ServiceAccessState.CALLED,
-            ServiceAccessState.ADMITTED,
+        try:
+            with self._conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE service_access
+                    SET state = %s
+                    WHERE id = %s AND state = %s
+                    RETURNING id, daily_presence_id, agenda_id, appointment_id,
+                              room_id
+                    """,
+                    (
+                        ServiceAccessState.ADMITTED.value,
+                        service_access_id,
+                        ServiceAccessState.CALLED.value,
+                    ),
+                )
+                updated = cursor.fetchone()
+                if updated is None:
+                    self._conn.commit()
+                    return None
+
+                (
+                    access_id,
+                    daily_presence_id,
+                    agenda_id,
+                    appointment_id,
+                    room_id,
+                ) = updated
+                cursor.execute(
+                    """
+                    INSERT INTO service_access_transition
+                        (service_access_id, previous_state, resulting_state)
+                    VALUES (%s, %s, %s)
+                    """,
+                    (
+                        access_id,
+                        ServiceAccessState.CALLED.value,
+                        ServiceAccessState.ADMITTED.value,
+                    ),
+                )
+                room_reference, room_label = self._read_room(cursor, room_id)
+                daily_presence = load_daily_presence(cursor, daily_presence_id)
+                agenda = load_agenda(cursor, agenda_id)
+                appointment = (
+                    load_appointment(cursor, appointment_id)
+                    if appointment_id is not None
+                    else None
+                )
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+
+        service_access = ServiceAccess(
+            id=access_id,
+            daily_presence=daily_presence,
+            agenda=agenda,
+            appointment=appointment,
+            state=ServiceAccessState.ADMITTED,
+        )
+        return AdmissionOutcome(
+            service_access=service_access,
+            room_reference=room_reference,
+            room_label=room_label,
         )
 
     def find_state(self, service_access_id: int) -> Optional[ServiceAccessState]:
@@ -86,7 +148,33 @@ class PostgresStateTransitionRepository:
             return None
         return ServiceAccessState(row[0])
 
-    # Internal helper
+    # Internal helpers
+
+    @staticmethod
+    def _read_room(
+        cursor: "psycopg.Cursor", room_id: Optional[int]
+    ) -> "tuple[str, str]":
+        """Read the reference and label of the persisted call-time Room.
+
+        A CALLED access always has a valid persisted call-time Room. Raise when
+        the room_id is missing or does not resolve to a configured Room, since
+        that is an inconsistent persistence state, not a normal case.
+        """
+        if room_id is None:
+            raise RuntimeError(
+                "admitted service access has no persisted call-time room"
+            )
+        cursor.execute(
+            "SELECT room_reference, label FROM room WHERE id = %s",
+            (room_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            raise RuntimeError(
+                f"call-time room {room_id} for an admitted service access "
+                "is not configured"
+            )
+        return row[0], row[1]
 
     def _try_transition(
         self,
@@ -96,9 +184,10 @@ class PostgresStateTransitionRepository:
     ) -> Optional[ServiceAccess]:
         """Run one atomic conditional transition from expected to target state.
 
-        Commits its own transaction on both the hit and the miss. Rebuilds the
-        resulting ServiceAccess on a hit, or returns None on a miss. No explicit
-        row locks are used.
+        Commits its own transaction on both the hit and the miss. On a hit it
+        also records the matching transition record in the same transaction,
+        then rebuilds the resulting ServiceAccess; on a miss it returns None. No
+        explicit row locks are used.
         """
         try:
             with self._conn.cursor() as cursor:
@@ -117,6 +206,14 @@ class PostgresStateTransitionRepository:
                     return None
 
                 access_id, daily_presence_id, agenda_id, appointment_id = updated
+                cursor.execute(
+                    """
+                    INSERT INTO service_access_transition
+                        (service_access_id, previous_state, resulting_state)
+                    VALUES (%s, %s, %s)
+                    """,
+                    (access_id, expected_state.value, target_state.value),
+                )
                 daily_presence = load_daily_presence(cursor, daily_presence_id)
                 agenda = load_agenda(cursor, agenda_id)
                 appointment = (

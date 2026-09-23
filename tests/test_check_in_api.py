@@ -54,6 +54,27 @@ def _service_with_appointment() -> CheckInService:
     return CheckInService([source], repository)
 
 
+def _service_with_totem(known_totems: dict[str, int]) -> CheckInService:
+    """A CheckInService that succeeds with one appointment and knows some Totems.
+
+    The repository resolves only the configured Totem references; any other
+    reference resolves to None and check-in rejects it.
+    """
+    resolutions = {(_SOURCE_CODE, _AGENDA_REFERENCE): _resolution()}
+    repository = FakeCheckInRepository(resolutions, known_totems)
+    source = ListAppointmentSource(
+        [
+            ExternalAppointmentData(
+                external_source_code=_SOURCE_CODE,
+                scheduled_at=datetime(2024, 5, 20, 9, 0),
+                external_agenda_reference=_AGENDA_REFERENCE,
+                external_appointment_reference="APPT-1",
+            )
+        ]
+    )
+    return CheckInService([source], repository)
+
+
 def _service_without_appointment() -> CheckInService:
     """A CheckInService whose source returns nothing relevant."""
     repository = FakeCheckInRepository({})
@@ -142,6 +163,67 @@ def test_public_call_code_does_not_contain_submitted_identifier(client):
 
     assert response.status_code == 200
     assert _KNOWN_VALUE not in response.json()["public_call_code"]
+
+
+# --- Optional Totem origin -------------------------------------------------
+# Validates: Requirements 3.2, 3.3, 3.4, 3.5 (and Property 10 / Requirements
+# 10.1-10.4: no response exposes the Patient Identifier).
+
+
+def test_check_in_with_valid_totem_reference_succeeds(client):
+    _override(_service_with_totem({"TOTEM-1": 1}))
+
+    response = client.post(
+        "/api/v1/check-ins",
+        json={
+            "identifier_type": FISCAL_CODE,
+            "identifier_value": _KNOWN_VALUE,
+            "totem_reference": "TOTEM-1",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert list(body.keys()) == ["public_call_code"]
+    assert body["public_call_code"] == "AAA001"
+    # The submitted identifier never leaks into the response.
+    assert _KNOWN_VALUE not in response.text
+
+
+def test_check_in_with_unknown_totem_reference_returns_400(client):
+    # The repository knows no matching Totem, so the reference is unknown.
+    _override(_service_with_totem({}))
+
+    response = client.post(
+        "/api/v1/check-ins",
+        json={
+            "identifier_type": FISCAL_CODE,
+            "identifier_value": _KNOWN_VALUE,
+            "totem_reference": "UNKNOWN",
+        },
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert isinstance(detail, str)
+    # Neither the submitted identifier nor its value leaks into the error.
+    assert _KNOWN_VALUE not in detail
+    assert _KNOWN_VALUE not in response.text
+
+
+def test_check_in_without_totem_reference_behaves_as_before(client):
+    _override(_service_with_appointment())
+
+    response = client.post(
+        "/api/v1/check-ins",
+        json={"identifier_type": FISCAL_CODE, "identifier_value": _KNOWN_VALUE},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert list(body.keys()) == ["public_call_code"]
+    assert body["public_call_code"] == "AAA001"
+    assert _KNOWN_VALUE not in response.text
 
 
 def test_unsupported_identifier_type_returns_4xx_with_description(client):

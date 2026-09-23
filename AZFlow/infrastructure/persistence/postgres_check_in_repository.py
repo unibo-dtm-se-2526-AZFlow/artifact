@@ -121,6 +121,19 @@ class PostgresCheckInRepository:
             active_queues=active_queues,
         )
 
+    def resolve_totem(self, totem_reference: str) -> Optional[int]:
+        """Return the configured Totem id for a reference, or None when unknown"""
+        with self._conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT id FROM totem WHERE external_reference = %s",
+                (totem_reference,),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        totem_id: int = row[0]
+        return totem_id
+
     def find_or_create_appointment(
         self,
         data: ExternalAppointmentData,
@@ -205,8 +218,12 @@ class PostgresCheckInRepository:
         patient_identifier: PatientIdentifier,
         operational_day: date,
         ticket_master: TicketMaster,
+        totem_id: Optional[int] = None,
     ) -> DailyPresence:
-        """Create a daily presence with the next public call code"""
+        """Create a daily presence with the next public call code
+
+        The optional originating Totem id is persisted on the new presence.
+        """
         try:
             with self._conn.cursor() as cursor:
                 # Create or increment the daily sequence in one transaction
@@ -234,9 +251,10 @@ class PostgresCheckInRepository:
                         patient_identifier_type,
                         patient_identifier_value,
                         public_call_code,
-                        ticket_master_id
+                        ticket_master_id,
+                        totem_id
                     )
-                    VALUES (%s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     RETURNING id
                     """,
                     (
@@ -245,6 +263,7 @@ class PostgresCheckInRepository:
                         patient_identifier.value,
                         public_call_code,
                         ticket_master.id,
+                        totem_id,
                     ),
                 )
                 daily_presence_id = self._require_returned_id(cursor.fetchone())
@@ -298,6 +317,16 @@ class PostgresCheckInRepository:
                 inserted = cursor.fetchone()
                 if inserted is not None:
                     service_access_id = inserted[0]
+                    # A new service access starts in WAITING; record it once.
+                    cursor.execute(
+                        """
+                        INSERT INTO service_access_transition (
+                            service_access_id, previous_state, resulting_state
+                        )
+                        VALUES (%s, NULL, %s)
+                        """,
+                        (service_access_id, ServiceAccessState.WAITING.value),
+                    )
                 else:
                     cursor.execute(
                         """

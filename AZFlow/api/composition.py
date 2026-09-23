@@ -7,29 +7,40 @@ the request ends.
 
 from __future__ import annotations
 
-from typing import Callable, Iterator
+from contextlib import contextmanager
+from typing import Callable, ContextManager, Iterator
 
 from fastapi import FastAPI, HTTPException, status
 
 from AZFlow.api.v1.calling import get_calling_service
 from AZFlow.api.v1.check_in import get_check_in_service
+from AZFlow.api.v1.displays import get_display_read_model
 from AZFlow.api.v1.queue_view import get_queue_view_service
 from AZFlow.api.v1.state_management import get_state_management_service
 from AZFlow.application.calling import CallingService
 from AZFlow.application.check_in import CheckInService
 from AZFlow.application.ports.call_event_publisher import CallEventPublisher
+from AZFlow.application.ports.display_read_model import DisplayReadModel
 from AZFlow.application.queue_view import QueueViewService
 from AZFlow.application.state_management import StateManagementService
 from AZFlow.infrastructure.appointment_sources.mock import MockAppointmentSource
 from AZFlow.infrastructure.config import load_settings
+from AZFlow.api.v1.ws_support import WebSocketDisplaySupport, set_ws_support
+from AZFlow.infrastructure.events.composite_publisher import (
+    CompositeCallEventPublisher,
+)
 from AZFlow.infrastructure.events.in_process_publisher import (
     InProcessCallEventPublisher,
 )
+from AZFlow.infrastructure.events.websocket_call_hub import WebSocketCallHub
 from AZFlow.infrastructure.persistence.postgres_call_repository import (
     PostgresCallRepository,
 )
 from AZFlow.infrastructure.persistence.postgres_check_in_repository import (
     PostgresCheckInRepository,
+)
+from AZFlow.infrastructure.persistence.postgres_display_read_model import (
+    PostgresDisplayReadModel,
 )
 from AZFlow.infrastructure.persistence.postgres_queue_view_reader import (
     PostgresQueueViewReader,
@@ -114,6 +125,45 @@ def wire_queue_view(application: FastAPI) -> None:
     )
 
 
+def build_display_read_model_provider(
+    database_url: object,
+    recent_calls_max: int,
+) -> Callable[[], Iterator[DisplayReadModel]]:
+    """Build the DisplayReadModel dependency used for each request
+
+    Each request gets a new PostgreSQL connection. The recent-calls bound comes
+    from configuration. A missing database URL returns HTTP 503.
+    """
+
+    def provide_display_read_model() -> Iterator[DisplayReadModel]:
+        if not database_url:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="display read model is not configured",
+            )
+
+        # Import here so application startup does not open a connection
+        import psycopg
+
+        with psycopg.connect(str(database_url)) as connection:
+            yield PostgresDisplayReadModel(connection, recent_calls_max)
+
+    return provide_display_read_model
+
+
+def wire_display_read_model(application: FastAPI) -> None:
+    """Connect the display read model to the FastAPI application
+
+    Tests can replace this dependency with a fake read model.
+    """
+    settings = load_settings()
+    application.dependency_overrides[get_display_read_model] = (
+        build_display_read_model_provider(
+            settings.database_url, settings.display_recent_calls_max
+        )
+    )
+
+
 def build_calling_service_provider(
     database_url: object,
     publisher: CallEventPublisher,
@@ -143,15 +193,54 @@ def build_calling_service_provider(
     return provide_calling_service
 
 
+def build_display_read_model_factory(
+    database_url: object,
+    recent_calls_max: int,
+) -> Callable[[], ContextManager[DisplayReadModel]]:
+    """Build a factory that opens a short-lived display read model.
+
+    The WebSocket hub and endpoints call this on the request thread (hub) or on
+    a worker thread via asyncio.to_thread (endpoints), so the psycopg work never
+    runs on the event loop. Each call opens and closes its own connection.
+    """
+
+    @contextmanager
+    def open_read_model() -> Iterator[DisplayReadModel]:
+        if not database_url:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="display read model is not configured",
+            )
+
+        # Import here so application startup does not open a connection
+        import psycopg
+
+        with psycopg.connect(str(database_url)) as connection:
+            yield PostgresDisplayReadModel(connection, recent_calls_max)
+
+    return open_read_model
+
+
 def wire_calling(application: FastAPI) -> None:
     """Connect the Patient Calling service to the FastAPI application
 
-    A single in-process publisher is shared across requests and intentionally
-    keeps the published events in memory, shared across those requests. Tests
-    can replace this dependency with a fake service.
+    The single publication seam fans out to the in-process publisher and the
+    WebSocket hub through a CompositeCallEventPublisher. The calling service
+    still receives a CallEventPublisher, so the core is unaware of WebSockets.
+    The shared hub is stored on the application state and bound to the running
+    event loop at startup. Tests can replace this dependency with a fake.
     """
     settings = load_settings()
-    publisher = InProcessCallEventPublisher()
+
+    read_model_factory = build_display_read_model_factory(
+        settings.database_url, settings.display_recent_calls_max
+    )
+    hub = WebSocketCallHub(read_model_factory)
+    publisher = CompositeCallEventPublisher([InProcessCallEventPublisher(), hub])
+
+    application.state.ws_call_hub = hub
+    set_ws_support(application, WebSocketDisplaySupport(hub, read_model_factory))
+
     application.dependency_overrides[get_calling_service] = (
         build_calling_service_provider(settings.database_url, publisher)
     )
