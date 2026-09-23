@@ -156,19 +156,24 @@ class PostgresStateTransitionRepository:
     ) -> "tuple[str, str]":
         """Read the reference and label of the persisted call-time Room.
 
-        A CALLED access called through the current flow always has a room_id.
-        If it is missing (older data), fall back to empty values instead of
-        failing.
+        A CALLED access always has a valid persisted call-time Room. Raise when
+        the room_id is missing or does not resolve to a configured Room, since
+        that is an inconsistent persistence state, not a normal case.
         """
         if room_id is None:
-            return "", ""
+            raise RuntimeError(
+                "admitted service access has no persisted call-time room"
+            )
         cursor.execute(
             "SELECT room_reference, label FROM room WHERE id = %s",
             (room_id,),
         )
         row = cursor.fetchone()
         if row is None:
-            return "", ""
+            raise RuntimeError(
+                f"call-time room {room_id} for an admitted service access "
+                "is not configured"
+            )
         return row[0], row[1]
 
     def _try_transition(

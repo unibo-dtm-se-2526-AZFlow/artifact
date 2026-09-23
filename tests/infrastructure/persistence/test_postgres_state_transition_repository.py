@@ -315,6 +315,35 @@ def test_try_transition_returns_none_for_missing_target(connection):
     assert repo.try_admit(999) is None
 
 
+# A missing/invalid call-time Room is an inconsistent state and must not commit
+
+
+def test_try_admit_with_null_room_raises_and_rolls_back(connection):
+    """Admitting a CALLED access whose room_id is NULL raises and commits
+    nothing: the row stays CALLED and no ADMITTED transition is recorded."""
+    sa_id = _seed_access_in_state(connection, "CALLED")
+    repo = PostgresStateTransitionRepository(connection)
+    assert _read_room_id(connection, sa_id) is None
+
+    with pytest.raises(RuntimeError):
+        repo.try_admit(sa_id)
+
+    # The rollback undid the CALLED->ADMITTED UPDATE and the history INSERT.
+    assert _read_state(connection, sa_id) == "CALLED"
+    rows = _transition_rows(connection, sa_id)
+    assert all(resulting_state != "ADMITTED" for _, resulting_state, _ in rows)
+    assert len(rows) == 0
+
+
+def test_read_room_raises_for_unconfigured_room_id(connection):
+    """_read_room raises when the room_id does not resolve to a configured
+    Room, covering the not-found branch directly."""
+    repo = PostgresStateTransitionRepository(connection)
+    with connection.cursor() as cursor:
+        with pytest.raises(RuntimeError):
+            repo._read_room(cursor, 999999)
+
+
 # find_state distinguishes not-found from wrong-state (Property 3; Req 1.3, 2.3, 3.5)
 
 
