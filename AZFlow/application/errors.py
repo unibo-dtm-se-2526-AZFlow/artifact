@@ -104,3 +104,19 @@ class ServiceAccessNotAdmittableError(ApplicationError):
     def __init__(self, service_access_id: int) -> None:
         self.service_access_id = service_access_id
         super().__init__()
+
+
+class RoomNotFoundError(ApplicationError):
+    """Raised when the supplied room reference does not resolve to a configured Room."""
+
+    def __init__(self, room_reference: str) -> None:
+        self.room_reference = room_reference
+        super().__init__()
+
+
+class InvalidTotemReferenceError(ApplicationError):
+    """Raised when a supplied Totem reference does not resolve to a configured Totem."""
+
+    def __init__(self, totem_reference: str) -> None:
+        self.totem_reference = totem_reference
+        super().__init__()
