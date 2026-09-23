@@ -2,7 +2,8 @@
 
 It works with domain objects and the ServiceAccessState enum, not SQL rows.
 Each transition is a single atomic conditional change from an expected state to
-a new state. A miss is classified afterwards with a read-only state lookup.
+a new state, and it also records the matching transition record in the same
+transaction. A miss is classified afterwards with a read-only state lookup.
 """
 
 from __future__ import annotations
@@ -18,24 +19,28 @@ class StateTransitionRepository(Protocol):
     def try_suspend(self, service_access_id: int) -> Optional[ServiceAccess]:
         """Try the WAITING to SUSPENDED transition of one ServiceAccess.
 
-        Return the transitioned ServiceAccess, or None when it was no longer
-        WAITING.
+        On success it also records the WAITING to SUSPENDED transition in the
+        same transaction. Return the transitioned ServiceAccess, or None when it
+        was no longer WAITING.
         """
         ...
 
     def try_restore(self, service_access_id: int) -> Optional[ServiceAccess]:
         """Try the SUSPENDED to WAITING transition of one ServiceAccess.
 
-        Return the transitioned ServiceAccess, or None when it was no longer
-        SUSPENDED.
+        On success it also records the SUSPENDED to WAITING transition in the
+        same transaction. Return the transitioned ServiceAccess, or None when it
+        was no longer SUSPENDED.
         """
         ...
 
     def try_admit(self, service_access_id: int) -> Optional[ServiceAccess]:
         """Try the CALLED to ADMITTED transition of one ServiceAccess.
 
-        Return the transitioned ServiceAccess, or None when it was no longer
-        CALLED.
+        The transition uses the room_id already stored on the ServiceAccess row,
+        so there is no room input. On success it also records the CALLED to
+        ADMITTED transition in the same transaction. Return the transitioned
+        ServiceAccess, or None when it was no longer CALLED.
         """
         ...
 
