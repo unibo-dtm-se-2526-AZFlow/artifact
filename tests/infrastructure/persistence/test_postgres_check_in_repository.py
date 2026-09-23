@@ -27,9 +27,11 @@ from AZFlow.infrastructure.persistence.postgres_check_in_repository import (
 )
 from tests.infrastructure.persistence.seed import (
     seed_external_agenda,
+    seed_location_node,
     seed_queue,
     seed_source,
     seed_ticket_master,
+    seed_totem,
 )
 
 OPERATIONAL_DAY = date(2024, 3, 15)
@@ -399,3 +401,139 @@ def test_concurrent_service_access_creation_reuses_one_access(connection, dsn):
     with connection.cursor() as cursor:
         cursor.execute("SELECT count(*) FROM service_access")
         assert cursor.fetchone()[0] == 1
+
+
+def test_new_service_access_records_initial_waiting_history(connection):
+    """Property 2, Validates: Requirements 1.2, 1.3, 1.4, 1.5, 1.12.
+
+    Creating a new ServiceAccess writes exactly one initial transition record
+    with no previous state and a WAITING result, atomically with the row.
+    """
+    source = seed_source(connection)
+    external_agenda = seed_external_agenda(connection, source, "Cardiology", "AGENDA-A")
+    ticket_master = seed_ticket_master(connection, "AAA")
+
+    repo = PostgresCheckInRepository(connection)
+    presence = repo.create_daily_presence_with_code(
+        IDENTIFIER, OPERATIONAL_DAY, ticket_master
+    )
+    appointment = repo.find_or_create_appointment(
+        _appointment_data("MOCK-APPT-0001"), IDENTIFIER, external_agenda
+    )
+
+    access = repo.find_or_create_service_access(
+        presence, external_agenda.agenda, appointment
+    )
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT previous_state, resulting_state, occurred_at
+            FROM service_access_transition
+            WHERE service_access_id = %s
+            """,
+            (access.id,),
+        )
+        rows = cursor.fetchall()
+
+    assert len(rows) == 1
+    previous_state, resulting_state, occurred_at = rows[0]
+    assert previous_state is None
+    assert resulting_state == "WAITING"
+    assert occurred_at is not None
+
+
+def test_idempotent_service_access_reuse_writes_no_extra_history(connection):
+    """Property 2, Validates: Requirements 1.2, 1.3, 1.4, 1.5, 1.12.
+
+    Reusing an existing ServiceAccess returns the same row and adds no further
+    transition record.
+    """
+    source = seed_source(connection)
+    external_agenda = seed_external_agenda(connection, source, "Cardiology", "AGENDA-A")
+    ticket_master = seed_ticket_master(connection, "AAA")
+
+    repo = PostgresCheckInRepository(connection)
+    presence = repo.create_daily_presence_with_code(
+        IDENTIFIER, OPERATIONAL_DAY, ticket_master
+    )
+    appointment = repo.find_or_create_appointment(
+        _appointment_data("MOCK-APPT-0001"), IDENTIFIER, external_agenda
+    )
+
+    first = repo.find_or_create_service_access(
+        presence, external_agenda.agenda, appointment
+    )
+    second = repo.find_or_create_service_access(
+        presence, external_agenda.agenda, appointment
+    )
+
+    assert first.id == second.id
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT count(*) FROM service_access_transition WHERE service_access_id = %s",
+            (first.id,),
+        )
+        assert cursor.fetchone()[0] == 1
+
+
+def test_resolve_totem_returns_id_for_configured_reference(connection):
+    """Validates: Requirements 3.4, 3.5, 3.6.
+
+    A configured Totem resolves to its id, and an unknown reference resolves to
+    None.
+    """
+    node_id = seed_location_node(connection, "Site A")
+    totem_id = seed_totem(connection, node_id, "TOTEM-1")
+
+    repo = PostgresCheckInRepository(connection)
+
+    assert repo.resolve_totem("TOTEM-1") == totem_id
+    assert repo.resolve_totem("UNKNOWN") is None
+
+
+def test_daily_presence_persists_resolved_totem_origin(connection):
+    """Validates: Requirements 3.4, 3.5, 3.6.
+
+    A resolved Totem id is stored on the DailyPresence.
+    """
+    source = seed_source(connection)
+    seed_external_agenda(connection, source, "Cardiology", "AGENDA-A")
+    ticket_master = seed_ticket_master(connection, "AAA")
+    node_id = seed_location_node(connection, "Site A")
+    totem_id = seed_totem(connection, node_id, "TOTEM-1")
+
+    repo = PostgresCheckInRepository(connection)
+    presence = repo.create_daily_presence_with_code(
+        IDENTIFIER, OPERATIONAL_DAY, ticket_master, totem_id=totem_id
+    )
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT totem_id FROM daily_presence WHERE id = %s",
+            (presence.id,),
+        )
+        assert cursor.fetchone()[0] == totem_id
+
+
+def test_daily_presence_without_totem_leaves_origin_null(connection):
+    """Validates: Requirements 3.4, 3.5, 3.6.
+
+    When no Totem is supplied the DailyPresence origin stays NULL.
+    """
+    source = seed_source(connection)
+    seed_external_agenda(connection, source, "Cardiology", "AGENDA-A")
+    ticket_master = seed_ticket_master(connection, "AAA")
+
+    repo = PostgresCheckInRepository(connection)
+    presence = repo.create_daily_presence_with_code(
+        IDENTIFIER, OPERATIONAL_DAY, ticket_master
+    )
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT totem_id FROM daily_presence WHERE id = %s",
+            (presence.id,),
+        )
+        assert cursor.fetchone()[0] is None
