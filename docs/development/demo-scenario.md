@@ -89,6 +89,47 @@ curl -s -X POST \
 
 The selected ServiceAccess must be visible and WAITING in Queue 1. Calling an already called ServiceAccess returns a conflict instead of calling it again.
 
+## Suspend and restore
+
+Choose a WAITING `service_access_id` from a Queue response and suspend it:
+
+~~~bash
+SERVICE_ACCESS_ID=<id>
+
+curl -s -X POST \
+  "http://localhost:8000/api/v1/service-accesses/$SERVICE_ACCESS_ID/suspend"
+~~~
+
+The response should report `state: "SUSPENDED"`. The ServiceAccess disappears from every Queue that contains its Agenda because Queue views contain only WAITING accesses.
+
+Restore the same ServiceAccess:
+
+~~~bash
+curl -s -X POST \
+  "http://localhost:8000/api/v1/service-accesses/$SERVICE_ACCESS_ID/restore"
+~~~
+
+The response should report `state: "WAITING"`. The ServiceAccess becomes visible again in all relevant Queues and returns to the normal Queue ordering; restoring it does not give it priority.
+
+Trying to suspend a non-WAITING ServiceAccess or restore a non-SUSPENDED one returns a conflict.
+
+## Confirm admission
+
+After calling a Patient, keep the `service_access_id` returned by the call and confirm admission:
+
+~~~bash
+CALLED_SERVICE_ACCESS_ID=<id>
+
+curl -s -X POST \
+  "http://localhost:8000/api/v1/service-accesses/$CALLED_SERVICE_ACCESS_ID/admission" \
+  -H 'Content-Type: application/json' \
+  -d '{"room_reference":"ROOM-1"}'
+~~~
+
+The response should report `state: "ADMITTED"` and echo the same Room reference. The Room reference is operational context supplied by the client; AZFlow does not persist it or compare it with the Room used for the earlier call.
+
+An ADMITTED ServiceAccess stays outside Queue views and cannot be called again. Confirming admission for a ServiceAccess that is not CALLED returns a conflict.
+
 ## Extending the scenario
 
 Keep this dataset small and deterministic.
