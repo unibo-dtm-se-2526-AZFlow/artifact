@@ -13,7 +13,6 @@ from fastapi import APIRouter, Depends, HTTPException, Path, status
 from pydantic import BaseModel
 
 from AZFlow.application.errors import (
-    MissingRoomReferenceError,
     ServiceAccessNotAdmittableError,
     ServiceAccessNotFoundError,
     ServiceAccessNotRestorableError,
@@ -28,12 +27,6 @@ from AZFlow.application.state_management import (
 router = APIRouter()
 
 
-class AdmissionRequest(BaseModel):
-    """Call context received for confirm admission"""
-
-    room_reference: str
-
-
 class AgendaModel(BaseModel):
     """Served Agenda shown in a state-change response"""
 
@@ -44,7 +37,7 @@ class AgendaModel(BaseModel):
 class StateChangeResponse(BaseModel):
     """Successful state-change response, with no identifying Patient data
 
-    ``room_reference`` is present only for admission and omitted otherwise.
+    ``room_reference`` is optional and omitted when not set.
     """
 
     public_call_code: str
@@ -126,18 +119,12 @@ def restore(
     status_code=status.HTTP_200_OK,
 )
 def confirm_admission(
-    request: AdmissionRequest,
     service_access_id: int = Path(..., gt=0),
     service: StateManagementService = Depends(get_state_management_service),
 ) -> StateChangeResponse:
-    """Confirm admission of a CALLED ServiceAccess into the selected Room"""
+    """Confirm admission of a CALLED ServiceAccess into its call-time Room"""
     try:
-        result = service.confirm_admission(service_access_id, request.room_reference)
-    except MissingRoomReferenceError as error:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="room reference is required",
-        ) from error
+        result = service.confirm_admission(service_access_id)
     except ServiceAccessNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

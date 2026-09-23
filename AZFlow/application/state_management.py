@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from typing import NoReturn, Optional
 
 from AZFlow.application.errors import (
-    MissingRoomReferenceError,
     ServiceAccessNotAdmittableError,
     ServiceAccessNotFoundError,
     ServiceAccessNotRestorableError,
@@ -30,8 +29,9 @@ from AZFlow.domain.service_access import ServiceAccess, ServiceAccessState
 class StateChangeResult:
     """Result of a successful state change, with no identifying Patient data.
 
-    ``room_reference`` is set only for confirm admission and left None for
-    suspend and restore.
+    ``room_reference`` is optional and currently left None: admission reuses
+    the Room stored at call time, which is not carried on the transitioned
+    ServiceAccess, and suspend and restore have no Room.
     """
 
     public_call_code: str
@@ -76,44 +76,29 @@ class StateManagementService:
             return self._result(restored)
         self._reject_miss(service_access_id, ServiceAccessNotRestorableError)
 
-    def confirm_admission(
-        self,
-        service_access_id: int,
-        room_reference: str,
-    ) -> StateChangeResult:
-        """Confirm admission of a CALLED ServiceAccess into the selected Room.
+    def confirm_admission(self, service_access_id: int) -> StateChangeResult:
+        """Confirm admission of a CALLED ServiceAccess into its call-time Room.
 
-        The Room reference precondition is checked before any repository work.
+        The Room is the one persisted at call time and stored on the
+        ServiceAccess row; the caller does not supply or change it.
 
         Raises:
-            MissingRoomReferenceError: the Room reference is missing or blank.
             ServiceAccessNotFoundError: no ServiceAccess exists for the id.
             ServiceAccessNotAdmittableError: it exists but is not CALLED.
         """
-        self._require_room_reference(room_reference)
         admitted = self._repository.try_admit(service_access_id)
         if admitted is not None:
-            return self._result(admitted, room_reference)
+            return self._result(admitted)
         self._reject_miss(service_access_id, ServiceAccessNotAdmittableError)
 
     @staticmethod
-    def _require_room_reference(room_reference: str) -> None:
-        """Reject a missing, empty or whitespace-only Room reference."""
-        if room_reference is None or not room_reference.strip():
-            raise MissingRoomReferenceError()
-
-    @staticmethod
-    def _result(
-        service_access: ServiceAccess,
-        room_reference: Optional[str] = None,
-    ) -> StateChangeResult:
+    def _result(service_access: ServiceAccess) -> StateChangeResult:
         """Build the non-identifying result from the transitioned ServiceAccess."""
         return StateChangeResult(
             public_call_code=service_access.daily_presence.public_call_code,
             service_access_id=service_access.id,
             agenda=service_access.agenda,
             state=service_access.state,
-            room_reference=room_reference,
         )
 
     def _reject_miss(
