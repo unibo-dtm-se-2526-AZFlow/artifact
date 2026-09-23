@@ -41,6 +41,24 @@ INSERT INTO queue_agenda (queue_id, agenda_id) VALUES
     (2, 1),
     (3, 2);
 
+-- Daily presences and service accesses so state management can be driven
+-- end to end. Two are WAITING (for suspend) and two are CALLED (for confirm
+-- admission), one on each agenda. The operational day is set at load time.
+INSERT INTO daily_presence (
+    id, operational_day, patient_identifier_type, patient_identifier_value,
+    public_call_code, ticket_master_id
+) VALUES
+    (1, CURRENT_DATE, 'fiscal_code', 'SEED-WAIT-A', 'AAA001', 1),
+    (2, CURRENT_DATE, 'fiscal_code', 'SEED-WAIT-B', 'BBB001', 2),
+    (3, CURRENT_DATE, 'fiscal_code', 'SEED-CALL-A', 'AAA002', 1),
+    (4, CURRENT_DATE, 'fiscal_code', 'SEED-CALL-B', 'BBB002', 2);
+
+INSERT INTO service_access (id, daily_presence_id, agenda_id, appointment_id, state) VALUES
+    (1, 1, 1, NULL, 'WAITING'),
+    (2, 2, 2, NULL, 'WAITING'),
+    (3, 3, 1, NULL, 'CALLED'),
+    (4, 4, 2, NULL, 'CALLED');
+
 -- Move identity sequences after the fixed ids
 SELECT setval(pg_get_serial_sequence('external_source', 'id'),
               (SELECT MAX(id) FROM external_source));
@@ -52,5 +70,9 @@ SELECT setval(pg_get_serial_sequence('ticket_master', 'id'),
               (SELECT MAX(id) FROM ticket_master));
 SELECT setval(pg_get_serial_sequence('queue', 'id'),
               (SELECT MAX(id) FROM queue));
+SELECT setval(pg_get_serial_sequence('daily_presence', 'id'),
+              (SELECT MAX(id) FROM daily_presence));
+SELECT setval(pg_get_serial_sequence('service_access', 'id'),
+              (SELECT MAX(id) FROM service_access));
 
 COMMIT;

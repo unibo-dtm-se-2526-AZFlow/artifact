@@ -14,10 +14,12 @@ from fastapi import FastAPI, HTTPException, status
 from AZFlow.api.v1.calling import get_calling_service
 from AZFlow.api.v1.check_in import get_check_in_service
 from AZFlow.api.v1.queue_view import get_queue_view_service
+from AZFlow.api.v1.state_management import get_state_management_service
 from AZFlow.application.calling import CallingService
 from AZFlow.application.check_in import CheckInService
 from AZFlow.application.ports.call_event_publisher import CallEventPublisher
 from AZFlow.application.queue_view import QueueViewService
+from AZFlow.application.state_management import StateManagementService
 from AZFlow.infrastructure.appointment_sources.mock import MockAppointmentSource
 from AZFlow.infrastructure.config import load_settings
 from AZFlow.infrastructure.events.in_process_publisher import (
@@ -31,6 +33,9 @@ from AZFlow.infrastructure.persistence.postgres_check_in_repository import (
 )
 from AZFlow.infrastructure.persistence.postgres_queue_view_reader import (
     PostgresQueueViewReader,
+)
+from AZFlow.infrastructure.persistence.postgres_state_transition_repository import (
+    PostgresStateTransitionRepository,
 )
 
 
@@ -149,4 +154,42 @@ def wire_calling(application: FastAPI) -> None:
     publisher = InProcessCallEventPublisher()
     application.dependency_overrides[get_calling_service] = (
         build_calling_service_provider(settings.database_url, publisher)
+    )
+
+
+def build_state_management_service_provider(
+    database_url: object,
+) -> Callable[[], Iterator[StateManagementService]]:
+    """Build the StateManagementService dependency used for each request
+
+    Each request gets a new PostgreSQL connection. Suspend, restore and confirm
+    admission publish no event, so no publisher is created. A missing database
+    URL returns HTTP 503.
+    """
+
+    def provide_state_management_service() -> Iterator[StateManagementService]:
+        if not database_url:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="state management service is not configured",
+            )
+
+        # Import here so application startup does not open a connection
+        import psycopg
+
+        with psycopg.connect(str(database_url)) as connection:
+            repository = PostgresStateTransitionRepository(connection)
+            yield StateManagementService(repository)
+
+    return provide_state_management_service
+
+
+def wire_state_management(application: FastAPI) -> None:
+    """Connect the state-management service to the FastAPI application
+
+    Tests can replace this dependency with a fake service.
+    """
+    settings = load_settings()
+    application.dependency_overrides[get_state_management_service] = (
+        build_state_management_service_provider(settings.database_url)
     )
