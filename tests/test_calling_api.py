@@ -13,6 +13,7 @@ from AZFlow.application.errors import (
     NoPatientToCallError,
     QueueInactiveError,
     QueueNotFoundError,
+    RoomNotFoundError,
     ServiceAccessNotCallableError,
     ServiceAccessNotVisibleError,
 )
@@ -173,6 +174,8 @@ def test_success_response_exposes_only_the_closed_non_identifying_fields(client)
         (QueueNotFoundError(1), 404),
         (QueueInactiveError(1), 409),
         (NoPatientToCallError(1), 409),
+        # Property 4, Validates: Requirements 4.5, 6.4 - an unknown room is a conflict.
+        (RoomNotFoundError("ROOM-X"), 409),
         (MissingPublicCallCodeError(12), 500),
     ],
 )
@@ -213,6 +216,34 @@ def test_call_next_no_patient_is_distinct_from_not_found_queue(client):
     assert no_patient.status_code != not_found.status_code
 
 
+def test_call_next_unknown_room_is_distinct_from_missing_room_and_not_found(client):
+    # Property 4, Validates: Requirements 4.5, 6.4 - an unknown room (409) stays
+    # distinct from a missing room reference (422) and a not-found queue (404).
+    _override(FakeCallingService(error=RoomNotFoundError("ROOM-X")))
+    unknown_room = client.post(_NEXT_PATH, json={"room_reference": "ROOM-X"})
+    app.dependency_overrides.clear()
+
+    _override(FakeCallingService(error=MissingRoomReferenceError()))
+    missing_room = client.post(_NEXT_PATH, json={"room_reference": "ROOM-3"})
+    app.dependency_overrides.clear()
+
+    _override(FakeCallingService(error=QueueNotFoundError(1)))
+    not_found = client.post(_NEXT_PATH, json={"room_reference": "ROOM-3"})
+
+    assert unknown_room.status_code == 409
+    assert missing_room.status_code == 422
+    assert not_found.status_code == 404
+    statuses = {
+        unknown_room.status_code,
+        missing_room.status_code,
+        not_found.status_code,
+    }
+    assert len(statuses) == 3
+    # The detail stays a generic string with no identifying data.
+    assert isinstance(unknown_room.json()["detail"], str)
+    assert "ROOM-X" not in unknown_room.text
+
+
 # --- call_specific failure mapping ----------------------------------------
 
 
@@ -224,6 +255,8 @@ def test_call_next_no_patient_is_distinct_from_not_found_queue(client):
         (QueueInactiveError(1), 409),
         (ServiceAccessNotVisibleError(12), 404),
         (ServiceAccessNotCallableError(12), 409),
+        # Property 4, Validates: Requirements 4.5, 6.4 - an unknown room is a conflict.
+        (RoomNotFoundError("ROOM-X"), 409),
         (MissingPublicCallCodeError(12), 500),
     ],
 )
