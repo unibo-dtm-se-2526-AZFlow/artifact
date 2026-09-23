@@ -7,6 +7,7 @@ a test can assert both the outcome and that no repository work happened when a
 precondition fails.
 """
 
+import inspect
 from dataclasses import fields
 from datetime import date
 from typing import Dict, List, Optional
@@ -14,7 +15,6 @@ from typing import Dict, List, Optional
 import pytest
 
 from AZFlow.application.errors import (
-    MissingRoomReferenceError,
     ServiceAccessNotAdmittableError,
     ServiceAccessNotFoundError,
     ServiceAccessNotRestorableError,
@@ -33,7 +33,6 @@ from AZFlow.domain.ticket_master import TicketMaster
 _DAY = date(2024, 5, 20)
 _TICKET_MASTER = TicketMaster(id=1, prefix="AAA")
 _AGENDA = Agenda(id=1, name="Cardiology")
-_ROOM = "ROOM-3"
 
 
 def _service_access(
@@ -162,7 +161,7 @@ def test_confirm_admission_transitions_called_to_admitted():
     access = _service_access(40, ServiceAccessState.CALLED)
     service, repository = _service([access])
 
-    result = service.confirm_admission(40, _ROOM)
+    result = service.confirm_admission(40)
 
     assert result.state is ServiceAccessState.ADMITTED
     assert result.service_access_id == 40
@@ -223,7 +222,7 @@ def test_confirm_admission_not_found_when_no_row():
     service, repository = _service([])
 
     with pytest.raises(ServiceAccessNotFoundError) as info:
-        service.confirm_admission(40, _ROOM)
+        service.confirm_admission(40)
 
     assert info.value.service_access_id == 40
     assert repository.try_admit_ids == [40]
@@ -235,7 +234,7 @@ def test_confirm_admission_wrong_state_raises_not_admittable():
     service, repository = _service([access])
 
     with pytest.raises(ServiceAccessNotAdmittableError) as info:
-        service.confirm_admission(40, _ROOM)
+        service.confirm_admission(40)
 
     assert info.value.service_access_id == 40
     assert repository.find_state(40) is ServiceAccessState.WAITING
@@ -250,60 +249,33 @@ def test_not_found_and_wrong_state_error_types_are_distinct():
     assert ServiceAccessNotRestorableError is not ServiceAccessNotAdmittableError
 
 
-# --- Room reference precondition guards admission first (Property 5) --------
-# Requirements 3.3, 3.4, 11.4, 11.10
+# --- admission reuses the stored call-time Room (Property 5) ----------------
+# Validates: Requirements 5.4, 5.5, 5.6
 
 
-@pytest.mark.parametrize("room", ["", "   ", "\t\n"])
-def test_confirm_admission_blank_room_rejected_before_repository(room):
+def test_confirm_admission_takes_no_room_reference_argument():
+    # Lock the changed Spec 4 contract: the caller no longer supplies a Room.
+    parameters = inspect.signature(StateManagementService.confirm_admission).parameters
+    assert "room_reference" not in parameters
+    assert list(parameters) == ["self", "service_access_id"]
+
+
+def test_confirm_admission_uses_stored_room_and_returns_admitted():
+    # The Room comes from the stored row via the fake try_admit; the caller
+    # passes only the id and the transition succeeds to ADMITTED.
     access = _service_access(40, ServiceAccessState.CALLED)
     service, repository = _service([access])
 
-    with pytest.raises(MissingRoomReferenceError):
-        service.confirm_admission(40, room)
+    result = service.confirm_admission(40)
 
-    # The precondition fails before any repository call.
-    assert repository.try_admit_ids == []
-    assert repository.find_state_ids == []
-    assert repository.find_state(40) is ServiceAccessState.CALLED
-
-
-def test_confirm_admission_missing_room_rejected_before_repository():
-    access = _service_access(40, ServiceAccessState.CALLED)
-    service, repository = _service([access])
-
-    with pytest.raises(MissingRoomReferenceError):
-        service.confirm_admission(40, None)  # type: ignore[arg-type]
-
-    assert repository.try_admit_ids == []
+    assert result.state is ServiceAccessState.ADMITTED
+    assert result.service_access_id == 40
+    assert repository.try_admit_ids == [40]
     assert repository.find_state_ids == []
 
 
-def test_suspend_and_restore_take_no_room_reference():
-    # suspend and restore accept only the id; a Room reference is never required.
-    waiting = _service_access(40, ServiceAccessState.WAITING)
-    suspended = _service_access(41, ServiceAccessState.SUSPENDED)
-    service, _repository = _service([waiting, suspended])
-
-    assert service.suspend(40).room_reference is None
-    assert service.restore(41).room_reference is None
-
-
-# --- Room reference carried unchanged, admission only (Property 5) ----------
-# Requirements 3.13, 10.5
-
-
-def test_room_reference_is_carried_unchanged_into_admission_result():
-    access = _service_access(40, ServiceAccessState.CALLED)
-    service, _repository = _service([access])
-    room = "  ROOM-with spaces and CASE 42  "
-
-    result = service.confirm_admission(40, room)
-
-    assert result.room_reference == room
-
-
-def test_suspend_and_restore_results_carry_no_room_reference():
+def test_suspend_and_restore_carry_no_room_reference():
+    # suspend and restore have no Room; their results never expose one.
     waiting = _service_access(40, ServiceAccessState.WAITING)
     suspended = _service_access(41, ServiceAccessState.SUSPENDED)
     service, _repository = _service([waiting, suspended])
@@ -340,13 +312,13 @@ def test_successful_results_return_only_non_identifying_values():
 
     suspend_result = service.suspend(40)
     restore_result = service.restore(41)
-    admit_result = service.confirm_admission(42, _ROOM)
+    admit_result = service.confirm_admission(42)
 
     assert suspend_result.public_call_code == "AAA007"
     assert suspend_result.agenda == _AGENDA
     assert restore_result.public_call_code == "AAA008"
     assert admit_result.public_call_code == "AAA009"
-    assert admit_result.room_reference == _ROOM
+    assert admit_result.state is ServiceAccessState.ADMITTED
 
 
 # --- concurrency miss path at the application boundary (Property 4) ---------
@@ -381,7 +353,56 @@ def test_confirm_admission_concurrency_miss_reports_not_admittable_and_no_transi
     service, repository = _service([access])
 
     with pytest.raises(ServiceAccessNotAdmittableError):
-        service.confirm_admission(40, _ROOM)
+        service.confirm_admission(40)
 
     assert repository.try_admit_ids == [40]
     assert repository.find_state(40) is ServiceAccessState.ADMITTED
+
+
+# --- suspend, restore and admission publish no notification (Property 11) ---
+# Validates: Requirements 9.5, 13.1, 13.2, 13.3, 13.4
+
+
+def test_service_takes_only_the_repository_and_holds_no_publisher():
+    # StateManagementService has no notification seam: construction requires
+    # only the repository, so suspend/restore/admission cannot emit any event.
+    parameters = inspect.signature(StateManagementService.__init__).parameters
+    assert list(parameters) == ["self", "repository"]
+    assert not any(
+        "publish" in name or "event" in name or "notif" in name for name in parameters
+    )
+
+    repository = FakeStateTransitionRepository()
+    service = StateManagementService(repository)
+    assert not any(
+        "publish" in name or "event" in name or "notif" in name
+        for name in vars(service)
+    )
+
+
+def _publisher_probe(service: StateManagementService) -> None:
+    """Fail if the service holds anything that looks like a publisher.
+
+    The service takes no publisher dependency, so a spy cannot be injected.
+    Instead we assert the structural fact: no publisher-like collaborator is
+    stored, which means none of the operations can emit a CallEvent or a
+    display notification.
+    """
+    for value in vars(service).values():
+        assert not hasattr(value, "publish"), "unexpected publisher on the service"
+
+
+def test_suspend_restore_admission_emit_no_notification():
+    waiting = _service_access(40, ServiceAccessState.WAITING)
+    suspended = _service_access(41, ServiceAccessState.SUSPENDED)
+    called = _service_access(42, ServiceAccessState.CALLED)
+    service, _repository = _service([waiting, suspended, called])
+
+    # Each operation returns its result; none reaches a publisher because the
+    # service holds none.
+    assert service.suspend(40).state is ServiceAccessState.SUSPENDED
+    _publisher_probe(service)
+    assert service.restore(41).state is ServiceAccessState.WAITING
+    _publisher_probe(service)
+    assert service.confirm_admission(42).state is ServiceAccessState.ADMITTED
+    _publisher_probe(service)
