@@ -72,24 +72,7 @@ class PostgresDisplayReadModel:
             )
             rows = cursor.fetchall()
 
-        return [
-            DisplayCall(
-                public_call_code=public_call_code,
-                agenda=Agenda(id=agenda_id, name=agenda_name),
-                state=ServiceAccessState.CALLED,
-                room_reference=room_reference,
-                room_label=room_label,
-                occurred_at=occurred_at,
-            )
-            for (
-                public_call_code,
-                agenda_id,
-                agenda_name,
-                room_reference,
-                room_label,
-                occurred_at,
-            ) in rows
-        ]
+        return [self._to_display_call(row) for row in rows]
 
     def latest_call_for_room_monitor(
         self,
@@ -125,26 +108,42 @@ class PostgresDisplayReadModel:
             )
             row = cursor.fetchone()
 
-        if row is None:
-            return None
+        return None if row is None else self._to_display_call(row)
 
-        (
-            public_call_code,
-            agenda_id,
-            agenda_name,
-            room_reference,
-            room_label,
-            occurred_at,
-        ) = row
+    def latest_call_for_room(
+        self,
+        room_reference: str,
+        operational_day: date,
+    ) -> Optional[DisplayCall]:
+        """Return the latest call for a Room, addressed by its reference.
 
-        return DisplayCall(
-            public_call_code=public_call_code,
-            agenda=Agenda(id=agenda_id, name=agenda_name),
-            state=ServiceAccessState.CALLED,
-            room_reference=room_reference,
-            room_label=room_label,
-            occurred_at=occurred_at,
-        )
+        It is the single most recent current-day CALLED transition for the
+        Room, or None when there is none.
+        """
+        with self._conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT dp.public_call_code, a.id, a.name,
+                       r.room_reference, r.label, t.occurred_at
+                FROM room r
+                JOIN service_access sa ON sa.room_id = r.id
+                JOIN service_access_transition t ON t.service_access_id = sa.id
+                JOIN daily_presence dp ON dp.id = sa.daily_presence_id
+                JOIN agenda a          ON a.id = sa.agenda_id
+                WHERE r.room_reference = %(room_reference)s
+                  AND t.resulting_state = 'CALLED'
+                  AND dp.operational_day = %(operational_day)s
+                ORDER BY t.occurred_at DESC, t.id DESC
+                LIMIT 1
+                """,
+                {
+                    "room_reference": room_reference,
+                    "operational_day": operational_day,
+                },
+            )
+            row = cursor.fetchone()
+
+        return None if row is None else self._to_display_call(row)
 
     def waiting_room_monitor_exists(self, waiting_room_monitor_id: int) -> bool:
         """Return whether a WaitingRoomMonitor with this id is configured."""
@@ -210,3 +209,23 @@ class PostgresDisplayReadModel:
                 {"room_reference": room_reference},
             )
             return [row[0] for row in cursor.fetchall()]
+
+    @staticmethod
+    def _to_display_call(row: tuple) -> DisplayCall:
+        """Build a DisplayCall from a selected display row."""
+        (
+            public_call_code,
+            agenda_id,
+            agenda_name,
+            room_reference,
+            room_label,
+            occurred_at,
+        ) = row
+        return DisplayCall(
+            public_call_code=public_call_code,
+            agenda=Agenda(id=agenda_id, name=agenda_name),
+            state=ServiceAccessState.CALLED,
+            room_reference=room_reference,
+            room_label=room_label,
+            occurred_at=occurred_at,
+        )
