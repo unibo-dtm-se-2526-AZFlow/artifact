@@ -32,7 +32,14 @@ pytestmark = pytest.mark.skipif(
 )
 
 # All tables in dependency-safe truncation order (children before parents).
+# TRUNCATE ... CASCADE handles dependencies, so ordering only needs to stay
+# internally consistent: referencing tables come before what they reference.
 _ALL_TABLES = (
+    "service_access_transition",
+    "waiting_room_monitor_scope",
+    "waiting_room_monitor",
+    "room_monitor",
+    "room_workstation",
     "service_access",
     "ticket_sequence",
     "daily_presence",
@@ -43,6 +50,9 @@ _ALL_TABLES = (
     "agenda",
     "ticket_master",
     "external_source",
+    "room",
+    "totem",
+    "location_node",
 )
 
 
