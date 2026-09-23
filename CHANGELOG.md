@@ -1,3 +1,37 @@
+## [0.5.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.4.0...v0.5.0) (2026-09-23)
+
+### Features
+
+* **api:** add state management endpoints ([76e239b](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/76e239b4fb8578953749129c8b8d264755d1970b))
+* **api:** wire state management ([ee82152](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/ee82152ffb35362bc5e12cd62b84f71b95e398a9))
+* **application:** add state management errors ([e3a75e3](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/e3a75e377f56601abebef54d6ec30b711386557c))
+* **application:** add state management service ([df23020](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/df23020f3092b42ae55b0d01f1ac623d86eeb4f7))
+* **application:** add state transition port ([0fe4cf0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/0fe4cf00d894036f0ff0999c1d72089711abdcdc))
+* **domain:** add suspend, restore and admission transitions ([cddc308](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/cddc3083478293178b7a0a5147559d66f6f99562))
+* **persistence:** add state transition repository ([cf74e8a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/cf74e8a236ede4ffb6702dc43573d0fbae7b573b))
+
+### Documentation
+
+* **dev:** add patient calling demo ([da0ed44](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/da0ed44f034d88f06e0408dd317a25dc450044a6))
+* **dev:** add state management demo ([7f40826](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/7f40826102dcb81b280f9d3a4d18c2daade5e03e))
+
+### Tests
+
+* **suspend-restore-admission:** cover queue view and calling regression ([fb6219d](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/fb6219d0286e78e9a72e33f6922efba132d72e4f))
+* **suspend-restore-admission:** cover state management ([02da03b](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/02da03bad0e8335853293998f54bd49a45652f81))
+* **suspend-restore-admission:** cover state management api ([ae2dd6a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/ae2dd6a38c23fd4405bd7a990fd31c8bbc458199))
+* **suspend-restore-admission:** cover state management service ([c417948](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/c41794822874a6c195f069080734337b8f518e6f))
+* **suspend-restore-admission:** cover state transition repository ([d870f22](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/d870f22d515399cde67c2f609ad97756b0be39e8))
+
+### General maintenance
+
+* **persistence:** allow suspended and admitted states ([0128b7e](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/0128b7e89e2f95de9a295976fe7bfb88107f3905))
+* **test:** reset integration database before tests ([2016def](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/2016def0706de4f20414c7f2a6f6ae3a2bd2c951))
+
+### Refactoring
+
+* **persistence:** extract shared service access loader ([02cad99](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/02cad996125b4accda62a46e3ee1ec8dcad80697))
+
 ## [0.4.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.3.0...v0.4.0) (2026-09-22)
 
 ### Features
