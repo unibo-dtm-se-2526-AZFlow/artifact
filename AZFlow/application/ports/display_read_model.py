@@ -58,6 +58,20 @@ class DisplayReadModel(Protocol):
         """
         ...
 
+    def latest_call_for_room(
+        self,
+        room_reference: str,
+        operational_day: date,
+    ) -> Optional[DisplayCall]:
+        """Return the latest call for a Room, addressed by its reference.
+
+        It is the single latest call for the current operational day, or None
+        when there is none. The live transport uses this to build the message
+        for a just-published call, so its room_label and occurred_at come from
+        the persisted history and match what a snapshot would show.
+        """
+        ...
+
     def waiting_room_monitor_exists(self, waiting_room_monitor_id: int) -> bool:
         """Return whether a WaitingRoomMonitor with this id is configured.
 
