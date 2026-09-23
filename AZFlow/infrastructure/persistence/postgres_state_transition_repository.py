@@ -96,9 +96,10 @@ class PostgresStateTransitionRepository:
     ) -> Optional[ServiceAccess]:
         """Run one atomic conditional transition from expected to target state.
 
-        Commits its own transaction on both the hit and the miss. Rebuilds the
-        resulting ServiceAccess on a hit, or returns None on a miss. No explicit
-        row locks are used.
+        Commits its own transaction on both the hit and the miss. On a hit it
+        also records the matching transition record in the same transaction,
+        then rebuilds the resulting ServiceAccess; on a miss it returns None. No
+        explicit row locks are used.
         """
         try:
             with self._conn.cursor() as cursor:
@@ -117,6 +118,14 @@ class PostgresStateTransitionRepository:
                     return None
 
                 access_id, daily_presence_id, agenda_id, appointment_id = updated
+                cursor.execute(
+                    """
+                    INSERT INTO service_access_transition
+                        (service_access_id, previous_state, resulting_state)
+                    VALUES (%s, %s, %s)
+                    """,
+                    (access_id, expected_state.value, target_state.value),
+                )
                 daily_presence = load_daily_presence(cursor, daily_presence_id)
                 agenda = load_agenda(cursor, agenda_id)
                 appointment = (
