@@ -19,6 +19,7 @@ from AZFlow.application.errors import (
     ServiceAccessNotSuspendableError,
 )
 from AZFlow.application.ports.state_transition_repository import (
+    AdmissionOutcome,
     StateTransitionRepository,
 )
 from AZFlow.domain.agenda import Agenda
@@ -29,9 +30,9 @@ from AZFlow.domain.service_access import ServiceAccess, ServiceAccessState
 class StateChangeResult:
     """Result of a successful state change, with no identifying Patient data.
 
-    ``room_reference`` is optional and currently left None: admission reuses
-    the Room stored at call time, which is not carried on the transitioned
-    ServiceAccess, and suspend and restore have no Room.
+    ``room_reference`` and ``room_label`` describe the Room persisted at call
+    time and are set only for admission. Suspend and restore have no Room, so
+    both stay None.
     """
 
     public_call_code: str
@@ -39,6 +40,7 @@ class StateChangeResult:
     agenda: Agenda
     state: ServiceAccessState
     room_reference: Optional[str] = None
+    room_label: Optional[str] = None
 
 
 class StateManagementService:
@@ -86,9 +88,9 @@ class StateManagementService:
             ServiceAccessNotFoundError: no ServiceAccess exists for the id.
             ServiceAccessNotAdmittableError: it exists but is not CALLED.
         """
-        admitted = self._repository.try_admit(service_access_id)
-        if admitted is not None:
-            return self._result(admitted)
+        outcome = self._repository.try_admit(service_access_id)
+        if outcome is not None:
+            return self._admission_result(outcome)
         self._reject_miss(service_access_id, ServiceAccessNotAdmittableError)
 
     @staticmethod
@@ -99,6 +101,19 @@ class StateManagementService:
             service_access_id=service_access.id,
             agenda=service_access.agenda,
             state=service_access.state,
+        )
+
+    @staticmethod
+    def _admission_result(outcome: AdmissionOutcome) -> StateChangeResult:
+        """Build the admission result, including the persisted Room's data."""
+        service_access = outcome.service_access
+        return StateChangeResult(
+            public_call_code=service_access.daily_presence.public_call_code,
+            service_access_id=service_access.id,
+            agenda=service_access.agenda,
+            state=service_access.state,
+            room_reference=outcome.room_reference,
+            room_label=outcome.room_label,
         )
 
     def _reject_miss(

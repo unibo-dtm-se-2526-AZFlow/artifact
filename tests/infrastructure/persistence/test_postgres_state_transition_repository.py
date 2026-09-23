@@ -217,8 +217,11 @@ def test_try_admit_persists_admitted_state_durably_and_reuses_room(connection):
     admitted = repo.try_admit(sa_id)
 
     assert admitted is not None
-    assert admitted.id == sa_id
-    assert admitted.state is ServiceAccessState.ADMITTED
+    assert admitted.service_access.id == sa_id
+    assert admitted.service_access.state is ServiceAccessState.ADMITTED
+    # The outcome exposes the persisted Room's reference and label.
+    assert admitted.room_reference == ROOM_REFERENCE
+    assert admitted.room_label == "Room 3"
     assert _read_state(connection, sa_id) == "ADMITTED"
     # Admission does not touch the stored call-time Room.
     assert _read_room_id(connection, sa_id) == room_id
@@ -229,6 +232,24 @@ def test_try_admit_persists_admitted_state_durably_and_reuses_room(connection):
     assert previous_state == "CALLED"
     assert resulting_state == "ADMITTED"
     assert occurred_at is not None
+
+
+def test_try_admit_returns_configured_room_reference_and_label(connection):
+    """Admission exposes the reference and label of the Room persisted at call
+    time, and leaves the stored room_id unchanged (Property 5)."""
+    node_id = seed_location_node(connection, "Radiotherapy")
+    room_id = seed_room(connection, node_id, "ROOM-1", "Room 1")
+    sa_id = _seed_access_in_state(connection, "CALLED", room_id=room_id)
+
+    repo = PostgresStateTransitionRepository(connection)
+    room_id_before = _read_room_id(connection, sa_id)
+    admitted = repo.try_admit(sa_id)
+
+    assert admitted is not None
+    assert admitted.room_reference == "ROOM-1"
+    assert admitted.room_label == "Room 1"
+    # The persisted call-time Room stays the same across admission.
+    assert _read_room_id(connection, sa_id) == room_id_before == room_id
 
 
 # Conditional-UPDATE semantics: row for the expected state, none otherwise
@@ -277,7 +298,7 @@ def test_try_admit_returns_row_only_from_called(connection):
 
     first = repo.try_admit(sa_id)
     assert first is not None
-    assert first.state is ServiceAccessState.ADMITTED
+    assert first.service_access.state is ServiceAccessState.ADMITTED
 
     second = repo.try_admit(sa_id)
     assert second is None

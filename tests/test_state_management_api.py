@@ -19,9 +19,14 @@ from AZFlow.domain.service_access import ServiceAccessState
 _AGENDA = Agenda(id=3, name="Cardiology")
 
 
+_ROOM_REFERENCE = "ROOM-1"
+_ROOM_LABEL = "Room 1"
+
+
 def _result(
     state: ServiceAccessState,
     room_reference: Optional[str] = None,
+    room_label: Optional[str] = None,
 ) -> StateChangeResult:
     """A non-identifying successful state-change result."""
     return StateChangeResult(
@@ -30,6 +35,7 @@ def _result(
         agenda=_AGENDA,
         state=state,
         room_reference=room_reference,
+        room_label=room_label,
     )
 
 
@@ -63,7 +69,11 @@ class FakeStateManagementService:
         self.admission_calls.append(service_access_id)
         if self._error is not None:
             raise self._error
-        return _result(ServiceAccessState.ADMITTED)
+        return _result(
+            ServiceAccessState.ADMITTED,
+            room_reference=_ROOM_REFERENCE,
+            room_label=_ROOM_LABEL,
+        )
 
 
 @pytest.fixture
@@ -119,7 +129,7 @@ def test_restore_success_returns_2xx_and_non_identifying_shape(client):
     assert service.restore_calls == [12]
 
 
-def test_admission_success_returns_2xx_with_state(client):
+def test_admission_success_returns_2xx_with_state_and_room(client):
     service = FakeStateManagementService()
     _override(service)
 
@@ -132,13 +142,16 @@ def test_admission_success_returns_2xx_with_state(client):
         "service_access_id",
         "agenda",
         "state",
+        "room_reference",
+        "room_label",
     }
     assert body["public_call_code"] == "AAA001"
     assert body["service_access_id"] == 12
     assert body["agenda"] == {"id": 3, "name": "Cardiology"}
     assert body["state"] == "ADMITTED"
-    # Admission no longer carries a Room reference.
-    assert "room_reference" not in body
+    # Admission exposes the non-identifying Room reference and label.
+    assert body["room_reference"] == _ROOM_REFERENCE
+    assert body["room_label"] == _ROOM_LABEL
     assert service.admission_calls == [12]
 
 
@@ -152,7 +165,9 @@ def test_admission_uses_only_the_service_access_id(client):
     assert service.admission_calls == [12]
     body = response.json()
     assert body["state"] == "ADMITTED"
-    assert "room_reference" not in body
+    # The admission takes no room input, but exposes the persisted Room data.
+    assert body["room_reference"] == _ROOM_REFERENCE
+    assert body["room_label"] == _ROOM_LABEL
 
 
 # --- Privacy ---------------------------------------------------------------
@@ -174,7 +189,14 @@ def test_admission_uses_only_the_service_access_id(client):
         (
             _ADMISSION_PATH,
             None,
-            {"public_call_code", "service_access_id", "agenda", "state"},
+            {
+                "public_call_code",
+                "service_access_id",
+                "agenda",
+                "state",
+                "room_reference",
+                "room_label",
+            },
         ),
     ],
 )

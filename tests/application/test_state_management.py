@@ -20,6 +20,7 @@ from AZFlow.application.errors import (
     ServiceAccessNotRestorableError,
     ServiceAccessNotSuspendableError,
 )
+from AZFlow.application.ports.state_transition_repository import AdmissionOutcome
 from AZFlow.application.state_management import (
     StateChangeResult,
     StateManagementService,
@@ -33,6 +34,8 @@ from AZFlow.domain.ticket_master import TicketMaster
 _DAY = date(2024, 5, 20)
 _TICKET_MASTER = TicketMaster(id=1, prefix="AAA")
 _AGENDA = Agenda(id=1, name="Cardiology")
+_ROOM_REFERENCE = "ROOM-1"
+_ROOM_LABEL = "Room 1"
 
 
 def _service_access(
@@ -110,12 +113,21 @@ class FakeStateTransitionRepository:
             lambda access: access.restored(),
         )
 
-    def try_admit(self, service_access_id: int) -> Optional[ServiceAccess]:
+    def try_admit(self, service_access_id: int) -> Optional[AdmissionOutcome]:
         self.try_admit_ids.append(service_access_id)
-        return self._try_transition(
+        admitted = self._try_transition(
             service_access_id,
             ServiceAccessState.CALLED,
             lambda access: access.admitted(),
+        )
+        if admitted is None:
+            return None
+        # The Room comes from the stored call-time row; the fake returns the
+        # configured reference and label alongside the transitioned access.
+        return AdmissionOutcome(
+            service_access=admitted,
+            room_reference=_ROOM_REFERENCE,
+            room_label=_ROOM_LABEL,
         )
 
     def find_state(self, service_access_id: int) -> Optional[ServiceAccessState]:
@@ -262,7 +274,8 @@ def test_confirm_admission_takes_no_room_reference_argument():
 
 def test_confirm_admission_uses_stored_room_and_returns_admitted():
     # The Room comes from the stored row via the fake try_admit; the caller
-    # passes only the id and the transition succeeds to ADMITTED.
+    # passes only the id and the transition succeeds to ADMITTED, exposing the
+    # persisted Room's reference and label.
     access = _service_access(40, ServiceAccessState.CALLED)
     service, repository = _service([access])
 
@@ -270,18 +283,26 @@ def test_confirm_admission_uses_stored_room_and_returns_admitted():
 
     assert result.state is ServiceAccessState.ADMITTED
     assert result.service_access_id == 40
+    assert result.room_reference == _ROOM_REFERENCE
+    assert result.room_label == _ROOM_LABEL
     assert repository.try_admit_ids == [40]
     assert repository.find_state_ids == []
 
 
 def test_suspend_and_restore_carry_no_room_reference():
-    # suspend and restore have no Room; their results never expose one.
+    # suspend and restore have no Room; their results expose neither the Room
+    # reference nor the label.
     waiting = _service_access(40, ServiceAccessState.WAITING)
     suspended = _service_access(41, ServiceAccessState.SUSPENDED)
     service, _repository = _service([waiting, suspended])
 
-    assert service.suspend(40).room_reference is None
-    assert service.restore(41).room_reference is None
+    suspend_result = service.suspend(40)
+    restore_result = service.restore(41)
+
+    assert suspend_result.room_reference is None
+    assert suspend_result.room_label is None
+    assert restore_result.room_reference is None
+    assert restore_result.room_label is None
 
 
 # --- results expose only non-identifying data (Property 6) ------------------
@@ -296,6 +317,7 @@ def test_result_exposes_only_closed_non_identifying_fields():
         "agenda",
         "state",
         "room_reference",
+        "room_label",
     }
 
     assert field_names == expected
@@ -319,6 +341,9 @@ def test_successful_results_return_only_non_identifying_values():
     assert restore_result.public_call_code == "AAA008"
     assert admit_result.public_call_code == "AAA009"
     assert admit_result.state is ServiceAccessState.ADMITTED
+    # Admission exposes the non-identifying Room reference and label only.
+    assert admit_result.room_reference == _ROOM_REFERENCE
+    assert admit_result.room_label == _ROOM_LABEL
 
 
 # --- concurrency miss path at the application boundary (Property 4) ---------

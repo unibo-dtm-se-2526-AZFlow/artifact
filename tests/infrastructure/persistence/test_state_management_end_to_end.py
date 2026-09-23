@@ -201,21 +201,25 @@ def test_call_then_confirm_admission_end_to_end(wired_client, connection):
     called_id = call_next.json()["service_access_id"]
     assert _read_state(connection, called_id) == "CALLED"
 
-    # Admission takes no room_reference; it uses the stored call-time Room.
+    # Admission takes no room_reference; it uses the stored call-time Room and
+    # exposes that Room's reference and label.
     admission = wired_client.post(f"/api/v1/service-accesses/{called_id}/admission")
     assert admission.status_code == 200
     body = admission.json()
-    # room_reference is derived from the stored Room and currently left unset,
-    # so response_model_exclude_none omits it from the admission body.
     assert set(body.keys()) == {
         "public_call_code",
         "service_access_id",
         "agenda",
         "state",
+        "room_reference",
+        "room_label",
     }
     assert body["public_call_code"] == public_call_code
     assert body["service_access_id"] == called_id
     assert body["state"] == "ADMITTED"
+    # The admission response carries the configured Room reference and label.
+    assert body["room_reference"] == _ROOM
+    assert body["room_label"] == "Room 3"
     _assert_no_identifier(admission)
     # The ADMITTED state is durable.
     assert _read_state(connection, called_id) == "ADMITTED"

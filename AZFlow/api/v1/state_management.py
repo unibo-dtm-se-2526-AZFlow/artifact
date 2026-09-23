@@ -37,7 +37,8 @@ class AgendaModel(BaseModel):
 class StateChangeResponse(BaseModel):
     """Successful state-change response, with no identifying Patient data
 
-    ``room_reference`` is optional and omitted when not set.
+    ``room_reference`` and ``room_label`` are set only for admission and
+    omitted otherwise.
     """
 
     public_call_code: str
@@ -45,6 +46,7 @@ class StateChangeResponse(BaseModel):
     agenda: AgendaModel
     state: str
     room_reference: Optional[str] = None
+    room_label: Optional[str] = None
 
 
 def get_state_management_service() -> StateManagementService:
@@ -147,4 +149,5 @@ def _to_response(result: StateChangeResult) -> StateChangeResponse:
         agenda=AgendaModel(id=result.agenda.id, name=result.agenda.name),
         state=result.state.value,
         room_reference=result.room_reference,
+        room_label=result.room_label,
     )
