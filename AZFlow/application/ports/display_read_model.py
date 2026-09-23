@@ -58,17 +58,20 @@ class DisplayReadModel(Protocol):
         """
         ...
 
-    def latest_call_for_room(
+    def display_call_for_service_access(
         self,
-        room_reference: str,
+        service_access_id: int,
         operational_day: date,
     ) -> Optional[DisplayCall]:
-        """Return the latest call for a Room, addressed by its reference.
+        """Return the CALLED display call for one ServiceAccess.
 
-        It is the single latest call for the current operational day, or None
-        when there is none. The live transport uses this to build the message
-        for a just-published call, so its room_label and occurred_at come from
-        the persisted history and match what a snapshot would show.
+        It resolves the single current-day CALLED transition of exactly this
+        ServiceAccess, so its room_label and occurred_at are the authoritative
+        persisted values for that specific call. The live transport uses this
+        to build the message for a just-published event, addressing the call by
+        its ServiceAccess rather than by Room, so two calls to the same Room
+        close together never resolve to each other's data. None when there is
+        no current-day CALLED transition for the ServiceAccess.
         """
         ...
 

@@ -110,34 +110,36 @@ class PostgresDisplayReadModel:
 
         return None if row is None else self._to_display_call(row)
 
-    def latest_call_for_room(
+    def display_call_for_service_access(
         self,
-        room_reference: str,
+        service_access_id: int,
         operational_day: date,
     ) -> Optional[DisplayCall]:
-        """Return the latest call for a Room, addressed by its reference.
+        """Return the CALLED display call for one ServiceAccess.
 
-        It is the single most recent current-day CALLED transition for the
-        Room, or None when there is none.
+        It resolves the single most recent current-day CALLED transition of
+        exactly this ServiceAccess, so the returned room_label and occurred_at
+        are the authoritative persisted values for that specific call. None
+        when there is no current-day CALLED transition for the ServiceAccess.
         """
         with self._conn.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT dp.public_call_code, a.id, a.name,
                        r.room_reference, r.label, t.occurred_at
-                FROM room r
-                JOIN service_access sa ON sa.room_id = r.id
+                FROM service_access sa
                 JOIN service_access_transition t ON t.service_access_id = sa.id
+                JOIN room r            ON r.id = sa.room_id
                 JOIN daily_presence dp ON dp.id = sa.daily_presence_id
                 JOIN agenda a          ON a.id = sa.agenda_id
-                WHERE r.room_reference = %(room_reference)s
+                WHERE sa.id = %(service_access_id)s
                   AND t.resulting_state = 'CALLED'
                   AND dp.operational_day = %(operational_day)s
                 ORDER BY t.occurred_at DESC, t.id DESC
                 LIMIT 1
                 """,
                 {
-                    "room_reference": room_reference,
+                    "service_access_id": service_access_id,
                     "operational_day": operational_day,
                 },
             )

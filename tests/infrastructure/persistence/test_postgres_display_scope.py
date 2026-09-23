@@ -7,6 +7,8 @@ They cover the read-model operations the WebSocket transport uses:
   covering a Room and excludes out-of-scope monitors.
 - Property 5 (Validates 3.1, 3.2, 3.3, 3.4, 4.3, 4.4): existence is a plain
   configuration check, independent of whether a monitor has any calls.
+- Property 1 (Validates 5.1, 5.2): display_call_for_service_access resolves the
+  exact call by ServiceAccess, so two calls to the same Room never mix up.
 """
 
 from __future__ import annotations
@@ -196,3 +198,109 @@ def _seed_call(conn, room_id: int, public_call_code: str) -> None:
             (sa_id, datetime(2024, 3, 15, 9, 0)),
         )
     conn.commit()
+
+
+# Property 1 (regression) - resolve the exact call by ServiceAccess id.
+
+
+def _seed_call_for_access(
+    conn,
+    room_id: int,
+    agenda_id: int,
+    ticket_master_id: int,
+    public_call_code: str,
+    identifier_value: str,
+    occurred_at: datetime,
+) -> int:
+    """Seed one full CALLED call for a Room and return its ServiceAccess id."""
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO daily_presence (
+                operational_day, patient_identifier_type,
+                patient_identifier_value, public_call_code, ticket_master_id
+            )
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
+            """,
+            (
+                OPERATIONAL_DAY,
+                "fiscal_code",
+                identifier_value,
+                public_call_code,
+                ticket_master_id,
+            ),
+        )
+        dp_id = cursor.fetchone()[0]
+        cursor.execute(
+            """
+            INSERT INTO service_access (
+                daily_presence_id, agenda_id, appointment_id, state, room_id
+            )
+            VALUES (%s, %s, NULL, 'CALLED', %s)
+            RETURNING id
+            """,
+            (dp_id, agenda_id, room_id),
+        )
+        sa_id = cursor.fetchone()[0]
+        cursor.execute(
+            """
+            INSERT INTO service_access_transition (
+                service_access_id, previous_state, resulting_state, occurred_at
+            )
+            VALUES (%s, 'WAITING', 'CALLED', %s)
+            """,
+            (sa_id, occurred_at),
+        )
+    conn.commit()
+    return sa_id
+
+
+def test_display_call_for_service_access_resolves_the_exact_call(connection):
+    """Two calls to the same Room each resolve to their own DisplayCall."""
+    topology = _Topology(connection)
+    agenda_id = seed_external_agenda(
+        connection, seed_source(connection), "Cardiology", "AGENDA-A"
+    ).agenda.id
+    ticket_master = seed_ticket_master(connection, "AAA")
+
+    first_id = _seed_call_for_access(
+        connection,
+        topology.room1,
+        agenda_id,
+        ticket_master.id,
+        "AAA001",
+        "SEED-1",
+        datetime(2024, 3, 15, 9, 0),
+    )
+    second_id = _seed_call_for_access(
+        connection,
+        topology.room1,
+        agenda_id,
+        ticket_master.id,
+        "AAA002",
+        "SEED-2",
+        datetime(2024, 3, 15, 9, 5),
+    )
+
+    read_model = _read_model(connection)
+
+    first = read_model.display_call_for_service_access(first_id, OPERATIONAL_DAY)
+    second = read_model.display_call_for_service_access(second_id, OPERATIONAL_DAY)
+
+    assert first is not None and second is not None
+    # Each resolves to its own persisted call, even though both are in ROOM-1
+    # and the second is the latest call in that Room.
+    assert first.public_call_code == "AAA001"
+    assert first.occurred_at == datetime(2024, 3, 15, 9, 0)
+    assert second.public_call_code == "AAA002"
+    assert second.occurred_at == datetime(2024, 3, 15, 9, 5)
+    assert first.room_label == "Room 1"
+
+
+def test_display_call_for_service_access_none_without_called_transition(connection):
+    """An unknown ServiceAccess id resolves to None."""
+    _Topology(connection)
+    read_model = _read_model(connection)
+
+    assert read_model.display_call_for_service_access(9999, OPERATIONAL_DAY) is None

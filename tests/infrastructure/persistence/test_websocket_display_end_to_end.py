@@ -78,6 +78,7 @@ from tests.infrastructure.persistence.seed import (
 
 _IDENTIFIER_VALUE = "RSSMRA80A01H501U"
 _IDENTIFIER_VALUE_2 = "DEV0002"  # a mock identifier with an AGENDA-A appointment
+_IDENTIFIER_VALUE_3 = "DEV0003"  # a mock identifier with an AGENDA-B appointment
 _ROOM_1 = "ROOM-1"
 _ROOM_2 = "ROOM-2"
 _ALLOWED_FIELDS = {
@@ -384,3 +385,43 @@ def test_suspend_restore_send_no_message(wired_client, connection):
         message = room.receive_json()
         assert message["type"] == "call"
         assert message["call"]["public_call_code"] == second["public_call_code"]
+
+
+# Property 1 (regression) - the live call is resolved for the exact event.
+
+
+def test_two_calls_same_room_resolve_to_their_own_events(wired_client):
+    """Two Patients called into ROOM-1 close together each deliver their own
+    call.
+
+    Two distinct Patients (so two distinct public call codes) are called into
+    ROOM-1 in sequence. The room monitor must receive the first event's code
+    first and the second event's code second: the hub resolves each event by
+    its ServiceAccess, so the first event never picks up the second (latest)
+    call's data. The codes differ, so a mix-up would be visible.
+    """
+    # Two Patients with exactly one appointment each, so the two call_next
+    # calls necessarily hit two distinct Patients with distinct call codes.
+    _check_in(wired_client, _IDENTIFIER_VALUE_2)
+    _check_in(wired_client, _IDENTIFIER_VALUE_3)
+    seeded = wired_client.seeded
+
+    with wired_client.websocket_connect(
+        f"/api/v1/ws/room-monitors/{seeded.room_monitor_id}"
+    ) as room:
+        assert room.receive_json()["type"] == "snapshot"
+
+        first = _call_next(wired_client, seeded.queue_id, _ROOM_1)
+        second = _call_next(wired_client, seeded.queue_id, _ROOM_1)
+        assert first["service_access_id"] != second["service_access_id"]
+        assert first["public_call_code"] != second["public_call_code"]
+
+        first_msg = room.receive_json()
+        second_msg = room.receive_json()
+
+        assert first_msg["type"] == "call"
+        assert second_msg["type"] == "call"
+        # Each live message carries its own event's call code, in order; the
+        # first event is not overwritten by the second (latest) call's data.
+        assert first_msg["call"]["public_call_code"] == first["public_call_code"]
+        assert second_msg["call"]["public_call_code"] == second["public_call_code"]

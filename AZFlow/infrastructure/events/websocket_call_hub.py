@@ -116,16 +116,18 @@ class WebSocketCallHub:
                 event.room_reference
             )
             room_ids = read_model.room_monitor_ids_for_room(event.room_reference)
-            display_call = read_model.latest_call_for_room(
-                event.room_reference, operational_day
+            # Resolve the exact call by ServiceAccess, not by Room, so two calls
+            # to the same Room close together never resolve to each other.
+            display_call = read_model.display_call_for_service_access(
+                event.service_access_id, operational_day
             )
 
         if display_call is None:
-            # The call was published but no current-day CALLED row resolves for
-            # the Room; there is nothing consistent to show, so send nothing.
+            # The event was published but no current-day CALLED transition
+            # resolves for this ServiceAccess; nothing consistent to show.
             _logger.debug(
-                "no display call resolved for room %s; skipping live delivery",
-                event.room_reference,
+                "no display call resolved for service access %s; skipping",
+                event.service_access_id,
             )
             return
 

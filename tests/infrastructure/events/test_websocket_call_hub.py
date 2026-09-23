@@ -6,8 +6,9 @@ Property 3 (Validates: Requirements 6.1, 6.2): the message carries only the
 non-identifying DisplayCall fields.
 
 These are DB-free: a fake read model provides the topology and the resolved
-DisplayCall, a fake queue records what is enqueued, and a stub loop runs the
-scheduled callback immediately so publish can be checked on one thread.
+DisplayCall (keyed on the ServiceAccess id), a fake queue records what is
+enqueued, and a stub loop runs the scheduled callback immediately so publish
+can be checked on one thread.
 """
 
 from __future__ import annotations
@@ -31,19 +32,21 @@ PATIENT_IDENTIFIER = "RSSMRA80A01H501U"
 _OCCURRED_AT = datetime(2024, 3, 15, 9, 31, tzinfo=timezone.utc)
 
 
-def _event(room_reference: str = "ROOM-1") -> CallEvent:
+def _event(service_access_id: int = 7, room_reference: str = "ROOM-1") -> CallEvent:
     return CallEvent(
         public_call_code="AAA001",
-        service_access_id=7,
+        service_access_id=service_access_id,
         agenda=Agenda(id=3, name="Cardiology"),
         state=ServiceAccessState.CALLED,
         room_reference=room_reference,
     )
 
 
-def _display_call(room_reference: str = "ROOM-1") -> DisplayCall:
+def _display_call(
+    public_call_code: str = "AAA001", room_reference: str = "ROOM-1"
+) -> DisplayCall:
     return DisplayCall(
-        public_call_code="AAA001",
+        public_call_code=public_call_code,
         agenda=Agenda(id=3, name="Cardiology"),
         state=ServiceAccessState.CALLED,
         room_reference=room_reference,
@@ -53,17 +56,17 @@ def _display_call(room_reference: str = "ROOM-1") -> DisplayCall:
 
 
 class _FakeReadModel:
-    """Fake DisplayReadModel returning fixed topology and a resolved call."""
+    """Fake DisplayReadModel returning fixed topology and per-access calls."""
 
     def __init__(
         self,
         waiting_ids: List[int],
         room_ids: List[int],
-        display_call: Optional[DisplayCall],
+        calls_by_access: Optional[Dict[int, DisplayCall]] = None,
     ) -> None:
         self._waiting_ids = waiting_ids
         self._room_ids = room_ids
-        self._display_call = display_call
+        self._calls_by_access = calls_by_access or {}
 
     def waiting_room_monitor_ids_for_room(self, room_reference: str) -> List[int]:
         return list(self._waiting_ids)
@@ -71,10 +74,10 @@ class _FakeReadModel:
     def room_monitor_ids_for_room(self, room_reference: str) -> List[int]:
         return list(self._room_ids)
 
-    def latest_call_for_room(
-        self, room_reference: str, operational_day: Any
+    def display_call_for_service_access(
+        self, service_access_id: int, operational_day: Any
     ) -> Optional[DisplayCall]:
-        return self._display_call
+        return self._calls_by_access.get(service_access_id)
 
 
 def _factory(read_model: _FakeReadModel):
@@ -104,13 +107,13 @@ def _drain(queue: "asyncio.Queue[Dict[str, Any]]") -> List[Dict[str, Any]]:
 
 
 def test_publish_enqueues_message_for_covered_waiting_room_monitor():
-    read_model = _FakeReadModel([5], [], _display_call())
+    read_model = _FakeReadModel([5], [], {7: _display_call()})
     loop = _ImmediateLoop()
     hub = WebSocketCallHub(_factory(read_model), loop=loop)
     queue: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue()
     hub.register(waiting_room_key(5), queue)
 
-    hub.publish(_event())
+    hub.publish(_event(service_access_id=7))
 
     messages = _drain(queue)
     assert len(messages) == 1
@@ -119,21 +122,19 @@ def test_publish_enqueues_message_for_covered_waiting_room_monitor():
 
 
 def test_publish_enqueues_message_for_covered_room_monitor():
-    read_model = _FakeReadModel([], [9], _display_call())
+    read_model = _FakeReadModel([], [9], {7: _display_call()})
     loop = _ImmediateLoop()
     hub = WebSocketCallHub(_factory(read_model), loop=loop)
     queue: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue()
     hub.register(room_key(9), queue)
 
-    hub.publish(_event())
+    hub.publish(_event(service_access_id=7))
 
     assert len(_drain(queue)) == 1
 
 
 def test_publish_does_not_enqueue_for_non_covered_monitor():
-    # The read model covers waiting-room monitor 5, but a client is subscribed
-    # to monitor 6, which is not covered.
-    read_model = _FakeReadModel([5], [], _display_call())
+    read_model = _FakeReadModel([5], [], {7: _display_call()})
     loop = _ImmediateLoop()
     hub = WebSocketCallHub(_factory(read_model), loop=loop)
     covered: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue()
@@ -141,20 +142,46 @@ def test_publish_does_not_enqueue_for_non_covered_monitor():
     hub.register(waiting_room_key(5), covered)
     hub.register(waiting_room_key(6), other)
 
-    hub.publish(_event())
+    hub.publish(_event(service_access_id=7))
 
     assert len(_drain(covered)) == 1
     assert _drain(other) == []
 
 
-def test_publish_message_carries_only_non_identifying_fields():
-    read_model = _FakeReadModel([5], [], _display_call())
+def test_publish_resolves_the_exact_call_for_the_event_not_another():
+    """Two calls in the same Room: publishing the first event resolves the
+    first call's DisplayCall by ServiceAccess id, never the second's."""
+    # ServiceAccess 7 -> AAA001, ServiceAccess 8 -> AAA002, both in ROOM-1.
+    calls = {
+        7: _display_call(public_call_code="AAA001"),
+        8: _display_call(public_call_code="AAA002"),
+    }
+    read_model = _FakeReadModel([5], [], calls)
     loop = _ImmediateLoop()
     hub = WebSocketCallHub(_factory(read_model), loop=loop)
     queue: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue()
     hub.register(waiting_room_key(5), queue)
 
-    hub.publish(_event())
+    # Publish the FIRST event; it must carry AAA001, not the other call.
+    hub.publish(_event(service_access_id=7))
+
+    message = _drain(queue)[0]
+    assert message["call"]["public_call_code"] == "AAA001"
+
+    # Publishing the second event carries AAA002.
+    hub.publish(_event(service_access_id=8))
+    message = _drain(queue)[0]
+    assert message["call"]["public_call_code"] == "AAA002"
+
+
+def test_publish_message_carries_only_non_identifying_fields():
+    read_model = _FakeReadModel([5], [], {7: _display_call()})
+    loop = _ImmediateLoop()
+    hub = WebSocketCallHub(_factory(read_model), loop=loop)
+    queue: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue()
+    hub.register(waiting_room_key(5), queue)
+
+    hub.publish(_event(service_access_id=7))
 
     call = _drain(queue)[0]["call"]
     assert set(call.keys()) == {
@@ -165,41 +192,39 @@ def test_publish_message_carries_only_non_identifying_fields():
         "room_label",
         "occurred_at",
     }
-    # No identifying attribute leaks anywhere in the serialised message.
     assert PATIENT_IDENTIFIER not in str(call)
     assert "patient" not in str(call).lower()
 
 
 def test_publish_returns_without_scheduling_when_no_connections():
-    read_model = _FakeReadModel([5], [], _display_call())
+    read_model = _FakeReadModel([5], [], {7: _display_call()})
     loop = _ImmediateLoop()
     hub = WebSocketCallHub(_factory(read_model), loop=loop)
 
-    hub.publish(_event())
+    hub.publish(_event(service_access_id=7))
 
-    # No connection: nothing scheduled on the loop and no blocking.
     assert loop.scheduled == 0
 
 
 def test_publish_sends_nothing_when_no_display_call_resolves():
-    # An unusual case: monitors cover the room but no current-day call resolves.
-    read_model = _FakeReadModel([5], [], None)
+    # Monitors cover the room but the ServiceAccess has no CALLED transition.
+    read_model = _FakeReadModel([5], [], {})
     loop = _ImmediateLoop()
     hub = WebSocketCallHub(_factory(read_model), loop=loop)
     queue: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue()
     hub.register(waiting_room_key(5), queue)
 
-    hub.publish(_event())
+    hub.publish(_event(service_access_id=7))
 
     assert _drain(queue) == []
 
 
 def test_publish_skips_when_loop_not_bound():
-    read_model = _FakeReadModel([5], [], _display_call())
+    read_model = _FakeReadModel([5], [], {7: _display_call()})
     hub = WebSocketCallHub(_factory(read_model))  # no loop bound yet
     queue: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue()
     hub.register(waiting_room_key(5), queue)
 
-    hub.publish(_event())
+    hub.publish(_event(service_access_id=7))
 
     assert _drain(queue) == []
