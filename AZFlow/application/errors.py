@@ -72,3 +72,35 @@ class ServiceAccessNotCallableError(ApplicationError):
     def __init__(self, service_access_id: int) -> None:
         self.service_access_id = service_access_id
         super().__init__()
+
+
+class ServiceAccessNotFoundError(ApplicationError):
+    """Raised when no ServiceAccess exists for the requested id."""
+
+    def __init__(self, service_access_id: int) -> None:
+        self.service_access_id = service_access_id
+        super().__init__()
+
+
+class ServiceAccessNotSuspendableError(ApplicationError):
+    """Raised when the target ServiceAccess exists but is not WAITING."""
+
+    def __init__(self, service_access_id: int) -> None:
+        self.service_access_id = service_access_id
+        super().__init__()
+
+
+class ServiceAccessNotRestorableError(ApplicationError):
+    """Raised when the target ServiceAccess exists but is not SUSPENDED."""
+
+    def __init__(self, service_access_id: int) -> None:
+        self.service_access_id = service_access_id
+        super().__init__()
+
+
+class ServiceAccessNotAdmittableError(ApplicationError):
+    """Raised when the target ServiceAccess exists but is not CALLED."""
+
+    def __init__(self, service_access_id: int) -> None:
+        self.service_access_id = service_access_id
+        super().__init__()
