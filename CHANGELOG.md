@@ -1,3 +1,65 @@
+## [0.6.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.5.0...v0.6.0) (2026-09-23)
+
+### Features
+
+* **api:** add websocket display endpoints ([19fa92c](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/19fa92c042d36b495b94e08c3885def65c8ec135))
+* **api:** wire composite publisher and websocket router ([357dc8e](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/357dc8e36bf36582b17a048f52d0746dc1ab20c3))
+* **api:** wire display read model and update check-in and calling routes ([85e54a1](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/85e54a1378cff0afe41113763443282f751066d4))
+* **application:** add display read model existence and inverse scope methods ([6537705](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/6537705fa82075264f114e07282c4277716821ea))
+* **application:** add display read model port ([7e0367a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/7e0367a0d461ed02740e39b93fc05fe7dc2e53ce))
+* **application:** add latest call for room read model method ([c5af11a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/c5af11a42a3db157c1a27a167c14b07b7bd89cf5))
+* **application:** add room and totem reference errors ([6dd769b](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/6dd769b6e710ed46f2ef97c1fcbd6ca5e1e3522c))
+* **application:** add transition record model ([d92a18f](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/d92a18f42a0b1b25e6fa3cf390393d063e887532))
+* **application:** extend call and transition ports for room and history ([dfc6297](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/dfc6297fd557ea294026b645ae1afe80218b0e03))
+* **application:** resolve room before calling transition ([4fa39bd](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/4fa39bdc0a60debb40e72d83a22a182ecc01dfcf))
+* **application:** reuse stored room at admission ([40d24e9](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/40d24e936bfdc77cf319a17df12cc111d048c40a))
+* **application:** support optional check-in totem origin ([d6b3752](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/d6b375230fabb81e30ddda86174dbdef263e3e28))
+* **config:** add display recent calls bound ([425f12b](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/425f12b309047e35fdb6db711152bf9bfbe26d70))
+* **events:** add composite call event publisher ([c2c1ecc](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/c2c1ecc4a898c7e7f0ad4b00df3372cb0639b04a))
+* **infrastructure:** add websocket call hub ([01ef52c](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/01ef52c5f790d170ce7ff17f7e011fadad0f3af3))
+* **persistence:** add display read model ([12ee685](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/12ee685fb3a4cdb853fae1b5932d50191829a7c8))
+* **persistence:** implement display read model existence and inverse scope ([1d2a20b](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/1d2a20bc5a2b66b4e8db6b5221890cddbe6e9946))
+* **persistence:** implement latest call for room ([ca72e8d](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/ca72e8dfe2b4c81d254b3398a5129f1e33f30593))
+* **persistence:** record initial waiting history and totem origin ([b5d810d](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/b5d810d4d18c2410904b57bab575e77001023752))
+* **persistence:** write room and transition history atomically ([6aefd0a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/6aefd0acd044ac58be7ea82d1695147a85bee8a6))
+
+### Bug Fixes
+
+* **api:** register websocket queue before reading snapshot ([ca9072c](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/ca9072c5964ae79d6a04afe51e090589f9e3a848))
+* **application:** keep operational_day as the second check-in argument ([2232218](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/2232218002ea14b2d7f33c76a7d4ff470696207b))
+* **infrastructure:** make websocket call hub registry thread-safe ([01e972a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/01e972ab3ac5802ab759f7c6093e5f94fc403b78))
+* **infrastructure:** resolve live call by service access id ([0a6b260](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/0a6b260418f3b484e4e0bf45f2d0ec2c75f8e798))
+* **persistence:** fail admission when the call-time room is missing or invalid ([b4ff274](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/b4ff274ad27f45c849bf4503aac8dafb7cca034d))
+* **state-management:** expose persisted room reference and label at admission ([7e47e50](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/7e47e50081c741357d9635b2f1feb8f7b0eabdd0))
+
+### Documentation
+
+* **dev:** add display notification demo ([261e887](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/261e887016a1b18fbcacfddae3d38f4fb67c96c2))
+
+### Tests
+
+* **call-notifications-and-displays:** cover admission room reuse ([26c9bb5](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/26c9bb56648cdb066e4ea2ef07b202e32ca5343c))
+* **call-notifications-and-displays:** cover call and transition persistence ([a98fb82](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/a98fb8223e1a917d882c6a433307f42c24915b7a))
+* **call-notifications-and-displays:** cover calling room resolution ([adbdeef](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/adbdeef18831f3df4a0141e3116e4f0ab61070e5))
+* **call-notifications-and-displays:** cover changed api contracts ([6b39de9](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/6b39de9204204534fdf280ed58313772fb1a7a3b))
+* **call-notifications-and-displays:** cover check-in persistence ([d44a804](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/d44a804694e26972f6433d0a6a2b37435493e46a))
+* **call-notifications-and-displays:** cover check-in totem origin ([b27968a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/b27968a0d9a643ddd4230620a0657cbe6da10289))
+* **call-notifications-and-displays:** cover display behaviour and privacy ([ba46845](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/ba46845088559c5695fbfabc2ae13d23e577144d))
+* **call-notifications-and-displays:** cover display read model ([0cddb32](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/0cddb325c15c3fea5f61109b8819291877d7ba21))
+* **persistence:** extend truncation list and seed helpers for topology ([fe1f20b](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/fe1f20b9ac90118b43b7da71f992f74ef2ceeaca))
+* **state-management:** drop room_reference from admission api tests ([c3ae56b](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/c3ae56b2818505e0d5046ffbaeb4b43150dcaad2))
+* **websocket-call-notifications:** cover composite fan-out ([57af226](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/57af2269247316198dcee621e13c5c1a885e5675))
+* **websocket-call-notifications:** cover existence and inverse scope read model ([9261b90](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/9261b9051e5c821f6180d2ee2bc4423704c180bb))
+* **websocket-call-notifications:** cover privacy and transport independence ([ef18d70](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/ef18d709462afaae4068c815c0d7dd16ff582182))
+* **websocket-call-notifications:** cover sync to async bridge ([ee26393](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/ee2639385321188ec9c9624754c74c50a7782d54))
+* **websocket-call-notifications:** cover websocket delivery ([a61933d](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/a61933d2f9d84651908cef4d0978a1d8c6807766))
+* **websocket-call-notifications:** use valid mock identities in delivery tests ([76fb587](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/76fb587e3d66c8e9c3dc552b77b85ae990070b9d))
+
+### General maintenance
+
+* **persistence:** add transition history and topology schema ([668f023](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/668f023df5ce29bf0807baecf22bdc1f62bc3cc2))
+* **persistence:** seed minimal topology and call-time data ([b8dec58](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/b8dec58a702d61d0d46c6fe812898f6e5b9de9ef))
+
 ## [0.5.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.4.0...v0.5.0) (2026-09-23)
 
 ### Features
