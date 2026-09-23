@@ -145,3 +145,68 @@ class PostgresDisplayReadModel:
             room_label=room_label,
             occurred_at=occurred_at,
         )
+
+    def waiting_room_monitor_exists(self, waiting_room_monitor_id: int) -> bool:
+        """Return whether a WaitingRoomMonitor with this id is configured."""
+        with self._conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT 1 FROM waiting_room_monitor WHERE id = %s",
+                (waiting_room_monitor_id,),
+            )
+            return cursor.fetchone() is not None
+
+    def room_monitor_exists(self, room_monitor_id: int) -> bool:
+        """Return whether a RoomMonitor with this id is configured."""
+        with self._conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT 1 FROM room_monitor WHERE id = %s",
+                (room_monitor_id,),
+            )
+            return cursor.fetchone() is not None
+
+    def waiting_room_monitor_ids_for_room(self, room_reference: str) -> List[int]:
+        """Return the WaitingRoomMonitors whose scope covers a Room.
+
+        A recursive CTE walks up from the Room's LocationNode to all its
+        ancestors. A monitor covers the Room when one of its scope nodes is any
+        of those nodes, so the descendant rule stays in the topology.
+        """
+        with self._conn.cursor() as cursor:
+            cursor.execute(
+                """
+                WITH RECURSIVE room_node AS (
+                    SELECT location_node_id AS id
+                    FROM room
+                    WHERE room_reference = %(room_reference)s
+                ),
+                ancestors AS (
+                    SELECT id FROM room_node
+                    UNION
+                    SELECT ln.parent_id
+                    FROM location_node ln
+                    JOIN ancestors a ON ln.id = a.id
+                    WHERE ln.parent_id IS NOT NULL
+                )
+                SELECT DISTINCT s.waiting_room_monitor_id
+                FROM waiting_room_monitor_scope s
+                WHERE s.location_node_id IN (SELECT id FROM ancestors)
+                ORDER BY s.waiting_room_monitor_id
+                """,
+                {"room_reference": room_reference},
+            )
+            return [row[0] for row in cursor.fetchall()]
+
+    def room_monitor_ids_for_room(self, room_reference: str) -> List[int]:
+        """Return the RoomMonitors bound to a Room."""
+        with self._conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT rm.id
+                FROM room_monitor rm
+                JOIN room r ON r.id = rm.room_id
+                WHERE r.room_reference = %(room_reference)s
+                ORDER BY rm.id
+                """,
+                {"room_reference": room_reference},
+            )
+            return [row[0] for row in cursor.fetchall()]
