@@ -148,6 +148,7 @@ class FakeCheckInRepository:
             operational_day=operational_day,
             public_call_code=format_public_call_code(ticket_master.prefix, sequence),
             ticket_master=ticket_master,
+            checked_in_at=datetime(2024, 5, 20, 8, 0),
         )
         self._next_daily_presence_id += 1
         self._daily_presences[key] = daily_presence

@@ -115,6 +115,7 @@ def test_create_daily_presence_reloads_existing_on_duplicate(connection):
 
     assert first.id == second.id
     assert first.public_call_code == second.public_call_code == "AAA001"
+    assert first.checked_in_at == second.checked_in_at
 
     with connection.cursor() as cursor:
         cursor.execute("SELECT count(*) FROM daily_presence")
@@ -137,6 +138,14 @@ def test_find_daily_presence_returns_existing(connection):
     assert found is not None
     assert found.id == created.id
     assert found.public_call_code == created.public_call_code
+    assert found.checked_in_at == created.checked_in_at
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT checked_in_at FROM daily_presence WHERE id = %s",
+            (created.id,),
+        )
+        assert cursor.fetchone()[0] == created.checked_in_at
 
 
 def test_appointment_recognition_reuses_the_same_row(connection):

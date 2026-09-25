@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 from AZFlow.domain.patient_identifier import PatientIdentifier
 from AZFlow.domain.ticket_master import TicketMaster
@@ -24,3 +24,4 @@ class DailyPresence:
     operational_day: date
     public_call_code: str
     ticket_master: TicketMaster
+    checked_in_at: datetime

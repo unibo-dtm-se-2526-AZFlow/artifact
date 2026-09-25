@@ -30,6 +30,7 @@ def load_daily_presence(
             dp.patient_identifier_type,
             dp.patient_identifier_value,
             dp.public_call_code,
+            dp.checked_in_at,
             tm.id,
             tm.prefix
         FROM daily_presence dp
@@ -48,6 +49,7 @@ def load_daily_presence(
         identifier_type,
         identifier_value,
         public_call_code,
+        checked_in_at,
         ticket_master_id,
         prefix,
     ) = row
@@ -59,6 +61,7 @@ def load_daily_presence(
         operational_day=operational_day,
         public_call_code=public_call_code,
         ticket_master=TicketMaster(id=ticket_master_id, prefix=prefix),
+        checked_in_at=checked_in_at,
     )
 
 
