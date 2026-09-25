@@ -40,7 +40,6 @@ def process_command(pid: int) -> str:
     return raw.replace(b"\0", b" ").decode(errors="replace").strip()
 
 
-
 def is_azflow_process(pid: int) -> bool:
     """Accept only listeners launched from this AZFlow checkout."""
     if process_cwd(pid) != REPO_ROOT:
@@ -56,9 +55,8 @@ def is_azflow_process(pid: int) -> bool:
             parent = int(Path(f"/proc/{pid}/stat").read_text().split()[3])
         except (FileNotFoundError, PermissionError, ValueError, IndexError):
             return False
-        return (
-            process_cwd(parent) == REPO_ROOT
-            and "scripts/dev.py" in process_command(parent)
+        return process_cwd(parent) == REPO_ROOT and "scripts/dev.py" in process_command(
+            parent
         )
 
     return False
