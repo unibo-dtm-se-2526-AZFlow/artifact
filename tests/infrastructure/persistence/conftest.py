@@ -64,18 +64,6 @@ def dsn() -> str:
     return value
 
 
-@pytest.fixture(scope="session", autouse=True)
-def _schema(dsn: str) -> None:
-    """Ensure the schema exists once for the test session."""
-    import psycopg
-
-    from AZFlow.infrastructure.persistence.schema import apply_schema
-
-    with psycopg.connect(dsn) as conn:
-        apply_schema(conn)
-        conn.commit()
-
-
 @pytest.fixture
 def connection(dsn: str) -> Iterator["object"]:
     """Provide a clean connection with truncated tables for each test."""

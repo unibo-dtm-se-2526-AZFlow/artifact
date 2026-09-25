@@ -33,8 +33,17 @@ def main() -> int:
     wait_for_postgres()
     reset_test_database()
 
+    test_database_url = database_url(TEST_DATABASE)
     environment = os.environ.copy()
-    environment["AZFLOW_TEST_DATABASE_URL"] = database_url(TEST_DATABASE)
+    environment["AZFLOW_TEST_DATABASE_URL"] = test_database_url
+    environment["AZFLOW_DATABASE_URL"] = test_database_url
+
+    migration_result = subprocess.call(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        env=environment,
+    )
+    if migration_result != 0:
+        return migration_result
 
     return subprocess.call(
         [sys.executable, "-m", "pytest", *sys.argv[1:]],
