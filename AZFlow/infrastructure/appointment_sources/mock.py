@@ -90,6 +90,40 @@ _DEFAULT_APPOINTMENTS: Dict[str, List[ExternalAppointmentData]] = {
 }
 
 
+def _demo_appointments() -> Dict[str, List[ExternalAppointmentData]]:
+    """Build the deterministic not-yet-arrived Patients used by the demo."""
+    result: Dict[str, List[ExternalAppointmentData]] = {}
+    multi = {
+        41: (2, 4),
+        52: (1, 5),
+        61: (2, 3),
+        67: (3, 4),
+        74: (1, 5),
+    }
+
+    for number in range(31, 81):
+        agenda_ids = multi.get(number, (((number - 31) % 5) + 1,))
+        appointments: List[ExternalAppointmentData] = []
+        for index, agenda_id in enumerate(agenda_ids):
+            # DEMO031 is deliberately late at mid-morning.
+            minutes = -120 if number == 31 else (number - 31) * 8 + index * 45
+            hour, minute = divmod(10 * 60 + 30 + minutes, 60)
+            appointments.append(
+                ExternalAppointmentData(
+                    external_source_code="MOCK",
+                    scheduled_at=datetime(2000, 1, 1, hour, minute),
+                    external_agenda_reference=f"AGENDA-{agenda_id}",
+                    external_appointment_reference=f"DEMO-APPT-{number:03d}-{index + 1}",
+                    external_patient_reference=f"DEMO-PAT-{number:03d}",
+                )
+            )
+        result[f"DEMO{number:03d}"] = appointments
+    return result
+
+
+_DEFAULT_APPOINTMENTS.update(_demo_appointments())
+
+
 class MockAppointmentSource:
     """In-memory appointment source used for development and tests
 

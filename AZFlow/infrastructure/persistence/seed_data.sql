@@ -1,128 +1,179 @@
--- Development/demo data for AZFlow
--- The data matches MockAppointmentSource and uses fixed ids
--- Agenda A has two active queues to test selection by the lowest queue id
+-- Development/demo data for the AZFlow 1.1 mid-morning scenario
+-- The matching not-yet-arrived appointments live in MockAppointmentSource.
 
 BEGIN;
 
--- External appointment source
 INSERT INTO external_source (id, code, name, connector_type, enabled)
 VALUES (1, 'MOCK', 'Mock source', 'mock', TRUE);
 
--- Local agendas and their external references
 INSERT INTO agenda (id, name) VALUES
-    (1, 'Agenda A'),
-    (2, 'Agenda B');
+    (1, 'Diagnostics'),
+    (2, 'Cardiology'),
+    (3, 'Oncology'),
+    (4, 'Blood Tests'),
+    (5, 'Radiotherapy');
 
 INSERT INTO external_agenda (
     id, agenda_id, external_source_id, external_reference, source_name
 ) VALUES
-    (1, 1, 1, 'AGENDA-A', 'Agenda A'),
-    (2, 2, 1, 'AGENDA-B', 'Agenda B');
+    (1, 1, 1, 'AGENDA-1', 'Diagnostics'),
+    (2, 2, 1, 'AGENDA-2', 'Cardiology'),
+    (3, 3, 1, 'AGENDA-3', 'Oncology'),
+    (4, 4, 1, 'AGENDA-4', 'Blood Tests'),
+    (5, 5, 1, 'AGENDA-5', 'Radiotherapy'),
+    (6, 1, 1, 'AGENDA-A', 'Diagnostics legacy alias'),
+    (7, 2, 1, 'AGENDA-B', 'Cardiology legacy alias');
 
--- Public call code prefixes
 INSERT INTO ticket_master (id, prefix) VALUES
-    (1, 'AAA'),
-    (2, 'BBB');
+    (1, 'A'), (2, 'B'), (3, 'C'), (4, 'D'), (5, 'E');
 
--- Queue View: queue 1 (BY_ARRIVAL) serves both Agenda A and Agenda B,
--- so a single queue covers more than one agenda.
--- Agenda A is shared by queue 1 and queue 2 (BY_APPOINTMENT);
--- Agenda B is shared by queue 1 and queue 3 (BY_APPOINTMENT),
--- so the same ServiceAccess is visible through queues with different policies.
--- The mock's earliest appointment is on Agenda A.
+-- Five primary queues plus a cross-cover queue and one inactive queue.
+-- Queue 1 gives the main BY_APPOINTMENT late-arrival demonstration.
+-- Queue 3 gives the main BY_ARRIVAL demonstration.
 INSERT INTO queue (id, status, policy, ticket_master_id) VALUES
-    (1, 'ACTIVE', 'BY_ARRIVAL', 1),
-    (2, 'ACTIVE', 'BY_APPOINTMENT', 2),
-    (3, 'ACTIVE', 'BY_APPOINTMENT', 2);
+    (1, 'ACTIVE',   'BY_APPOINTMENT', 1),
+    (2, 'ACTIVE',   'BY_APPOINTMENT', 2),
+    (3, 'ACTIVE',   'BY_ARRIVAL',     3),
+    (4, 'ACTIVE',   'BY_APPOINTMENT', 4),
+    (5, 'ACTIVE',   'BY_ARRIVAL',     5),
+    (6, 'ACTIVE',   'BY_APPOINTMENT', 2),
+    (99, 'INACTIVE','BY_APPOINTMENT', 1);
 
 INSERT INTO queue_agenda (queue_id, agenda_id) VALUES
     (1, 1),
-    (1, 2),
-    (2, 1),
-    (3, 2);
+    (2, 2),
+    (3, 3),
+    (4, 4),
+    (5, 5),
+    (6, 2),
+    (6, 4),
+    (99, 1);
 
--- Daily presences and service accesses so state management can be driven
--- end to end. Two are WAITING (for suspend) and two are CALLED (for confirm
--- admission), one on each agenda. The operational day is set at load time.
+-- Location topology used by the display demo.
+-- HOSPITAL
+--   Ground Floor -> Room 1, Room 2
+--   First Floor  -> Room 11
+INSERT INTO location_node (id, parent_id, label) VALUES
+    (1, NULL, 'HOSPITAL'),
+    (2, 1, 'Ground Floor'),
+    (3, 1, 'First Floor'),
+    (4, 2, 'Room 1 node'),
+    (5, 2, 'Room 2 node'),
+    (6, 3, 'Room 11 node');
+
+-- Totem 1 belongs to the hospital root and can receive Patients for all floors.
+INSERT INTO totem (id, external_reference, location_node_id)
+VALUES (1, 'TOTEM-1', 1);
+
+INSERT INTO room (id, room_reference, label, location_node_id) VALUES
+    (1, 'ROOM-1',  'Room 1',  4),
+    (2, 'ROOM-2',  'Room 2',  5),
+    (3, 'ROOM-11', 'Room 11', 6);
+
+INSERT INTO room_workstation (id, room_id) VALUES
+    (1, 1), (2, 2), (3, 3);
+
+INSERT INTO room_monitor (id, room_id) VALUES
+    (1, 1), (2, 2), (3, 3);
+
+INSERT INTO waiting_room_monitor (id, label) VALUES
+    (1, 'Waiting Room 1'),
+    (2, 'Waiting Room 2'),
+    (3, 'Waiting Room 11'),
+    (4, 'BAR');
+
+-- The two Ground Floor monitors intentionally share the same floor scope.
+-- BAR is scoped to HOSPITAL, so the recursive display query sees every Room.
+INSERT INTO waiting_room_monitor_scope (
+    waiting_room_monitor_id, location_node_id
+) VALUES
+    (1, 2),
+    (2, 2),
+    (3, 3),
+    (4, 1);
+
+-- Mid-morning context: 30 Patients have already checked in.
+-- Their appointment times are deterministic and spread across all five Agendas.
+INSERT INTO appointment (
+    id, scheduled_at, patient_identifier_type, patient_identifier_value,
+    external_agenda_id, external_patient_reference,
+    external_appointment_reference
+)
+SELECT
+    n,
+    CURRENT_DATE + TIME '08:00' + n * INTERVAL '7 minutes',
+    'fiscal_code',
+    'SEED' || LPAD(n::text, 3, '0'),
+    ((n - 1) % 5) + 1,
+    'SEED-PAT-' || LPAD(n::text, 3, '0'),
+    'SEED-APPT-' || LPAD(n::text, 3, '0')
+FROM generate_series(1, 30) AS n;
+
 INSERT INTO daily_presence (
     id, operational_day, patient_identifier_type, patient_identifier_value,
-    public_call_code, ticket_master_id
-) VALUES
-    (1, CURRENT_DATE, 'fiscal_code', 'SEED-WAIT-A', 'AAA001', 1),
-    (2, CURRENT_DATE, 'fiscal_code', 'SEED-WAIT-B', 'BBB001', 2),
-    (3, CURRENT_DATE, 'fiscal_code', 'SEED-CALL-A', 'AAA002', 1),
-    (4, CURRENT_DATE, 'fiscal_code', 'SEED-CALL-B', 'BBB002', 2);
+    public_call_code, ticket_master_id, totem_id
+)
+SELECT
+    n,
+    CURRENT_DATE,
+    'fiscal_code',
+    'SEED' || LPAD(n::text, 3, '0'),
+    CHR(65 + ((n - 1) % 5)) || LPAD(n::text, 3, '0'),
+    ((n - 1) % 5) + 1,
+    1
+FROM generate_series(1, 30) AS n;
 
-INSERT INTO service_access (id, daily_presence_id, agenda_id, appointment_id, state) VALUES
-    (1, 1, 1, NULL, 'WAITING'),
-    (2, 2, 2, NULL, 'WAITING'),
-    (3, 3, 1, NULL, 'CALLED'),
-    (4, 4, 2, NULL, 'CALLED');
+-- 17 Patients are already ADMITTED, 3 are CALLED and 10 are still WAITING.
+-- Only called/admitted accesses have a persisted call-time Room.
+INSERT INTO service_access (
+    id, daily_presence_id, agenda_id, appointment_id, state, room_id
+)
+SELECT
+    n,
+    n,
+    ((n - 1) % 5) + 1,
+    n,
+    CASE
+        WHEN n <= 17 THEN 'ADMITTED'
+        WHEN n <= 20 THEN 'CALLED'
+        ELSE 'WAITING'
+    END,
+    CASE
+        WHEN n > 20 THEN NULL
+        WHEN ((n - 1) % 5) + 1 = 1 THEN 1
+        WHEN ((n - 1) % 5) + 1 = 2 THEN 2
+        ELSE 3
+    END
+FROM generate_series(1, 30) AS n;
 
--- Keep the daily ticket counters consistent with the seeded public call codes.
--- Both ticket masters already used numbers 1 and 2 today, so the next
--- check-in must receive AAA003 or BBB003.
-INSERT INTO ticket_sequence (ticket_master_id, operational_day, last_number) VALUES
-    (1, CURRENT_DATE, 2),
-    (2, CURRENT_DATE, 2);
-
--- Location topology: a tree with no fixed levels. Company is the root; the
--- Radiotherapy branch has two leaf nodes and a nested Brachytherapy sub-branch,
--- while Oncology is a sibling branch. This lets descendant scoping be exercised.
---   Company > Site A > { Radiotherapy > { Node-R1, Node-R2, Brachytherapy > { Node-R3 } },
---                        Oncology > { Node-R4 } }
-INSERT INTO location_node (id, parent_id, label) VALUES
-    (1, NULL, 'Company'),
-    (2, 1, 'Site A'),
-    (3, 2, 'Radiotherapy'),
-    (4, 3, 'Node-R1'),
-    (5, 3, 'Node-R2'),
-    (6, 3, 'Brachytherapy'),
-    (7, 6, 'Node-R3'),
-    (8, 2, 'Oncology'),
-    (9, 8, 'Node-R4');
-
--- Rooms reuse the demo references. ROOM-1 sits in the Radiotherapy branch and
--- ROOM-2 in the Oncology branch, so a Radiotherapy-scoped display sees only ROOM-1.
-INSERT INTO room (id, room_reference, label, location_node_id) VALUES
-    (1, 'ROOM-1', 'Room 1', 4),
-    (2, 'ROOM-2', 'Room 2', 9);
-
--- Exactly one workstation per Room (the seed satisfies the product invariant).
-INSERT INTO room_workstation (id, room_id) VALUES
-    (1, 1),
-    (2, 2);
-
--- Optional Room monitor: ROOM-1 has one, ROOM-2 has none (zero-or-one case).
-INSERT INTO room_monitor (id, room_id) VALUES
-    (1, 1);
-
--- Waiting-room display scoped to the Radiotherapy node, so it sees ROOM-1 and
--- its descendants but not ROOM-2 under Oncology.
-INSERT INTO waiting_room_monitor (id, label) VALUES
-    (1, 'Radiotherapy waiting room');
-
-INSERT INTO waiting_room_monitor_scope (waiting_room_monitor_id, location_node_id) VALUES
-    (1, 3);
-
--- Totem for the optional check-in origin, placed under Site A.
-INSERT INTO totem (id, external_reference, location_node_id) VALUES
-    (1, 'TOTEM-1', 2);
-
--- Give the CALLED service accesses their call-time Room so a display view is
--- non-empty for the demo: id 3 (Agenda A) in ROOM-1, id 4 (Agenda B) in ROOM-2.
-UPDATE service_access SET room_id = 1 WHERE id = 3;
-UPDATE service_access SET room_id = 2 WHERE id = 4;
-
--- WAITING->CALLED transition records for the two calls, with distinct times in
--- the current operational day so recent/latest ordering is deterministic.
+-- Every previously called Patient has a WAITING -> CALLED history record.
 INSERT INTO service_access_transition (
-    id, service_access_id, previous_state, resulting_state, occurred_at
-) VALUES
-    (1, 3, 'WAITING', 'CALLED', CURRENT_DATE + TIME '09:00'),
-    (2, 4, 'WAITING', 'CALLED', CURRENT_DATE + TIME '09:05');
+    service_access_id, previous_state, resulting_state, occurred_at
+)
+SELECT
+    n,
+    'WAITING',
+    'CALLED',
+    CURRENT_DATE + TIME '08:25' + n * INTERVAL '4 minutes'
+FROM generate_series(1, 20) AS n;
 
--- Move identity sequences after the fixed ids
+-- The first 17 have also entered their Room.
+INSERT INTO service_access_transition (
+    service_access_id, previous_state, resulting_state, occurred_at
+)
+SELECT
+    n,
+    'CALLED',
+    'ADMITTED',
+    CURRENT_DATE + TIME '08:35' + n * INTERVAL '4 minutes'
+FROM generate_series(1, 17) AS n;
+
+-- All ticket masters start above the seeded suffixes. Gaps are harmless in demo data.
+INSERT INTO ticket_sequence (ticket_master_id, operational_day, last_number)
+SELECT id, CURRENT_DATE, 30
+FROM ticket_master;
+
+-- Move identity sequences after all fixed demo ids.
 SELECT setval(pg_get_serial_sequence('external_source', 'id'),
               (SELECT MAX(id) FROM external_source));
 SELECT setval(pg_get_serial_sequence('agenda', 'id'),
@@ -133,6 +184,8 @@ SELECT setval(pg_get_serial_sequence('ticket_master', 'id'),
               (SELECT MAX(id) FROM ticket_master));
 SELECT setval(pg_get_serial_sequence('queue', 'id'),
               (SELECT MAX(id) FROM queue));
+SELECT setval(pg_get_serial_sequence('appointment', 'id'),
+              (SELECT MAX(id) FROM appointment));
 SELECT setval(pg_get_serial_sequence('daily_presence', 'id'),
               (SELECT MAX(id) FROM daily_presence));
 SELECT setval(pg_get_serial_sequence('service_access', 'id'),
