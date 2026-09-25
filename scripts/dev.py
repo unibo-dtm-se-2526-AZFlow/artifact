@@ -69,9 +69,9 @@ def compose(
 
 
 def start_postgres() -> None:
-    """Start the Docker Compose ``postgres`` service in detached mode."""
-    print("Starting PostgreSQL via Docker Compose...")
-    compose("up", "-d", "postgres")
+    """Start PostgreSQL and local development tools via Docker Compose."""
+    print("Starting PostgreSQL and Adminer via Docker Compose...")
+    compose("--profile", "dev", "up", "-d", "postgres", "adminer")
 
 
 def wait_for_postgres() -> None:
@@ -97,6 +97,7 @@ def wait_for_postgres() -> None:
         )
         if result.returncode == 0:
             print("PostgreSQL is ready.")
+            print("Adminer available at http://localhost:8080")
             return
         time.sleep(READINESS_POLL_INTERVAL_SECONDS)
 
@@ -139,7 +140,10 @@ def run_azflow() -> None:
     os.environ["AZFLOW_DATABASE_URL"] = database_url()
 
     print(
-        f"Starting AZFlow on {config['AZFLOW_API_HOST']}:{config['AZFLOW_API_PORT']}..."
+        f"Starting AZFlow on http://localhost:{config['AZFLOW_API_PORT']}"
+    )
+    print(
+        f"Swagger UI available at http://localhost:{config['AZFLOW_API_PORT']}/docs"
     )
     uvicorn.run(
         "AZFlow.api:app",
