@@ -207,7 +207,7 @@ def reset_database() -> None:
         return
 
     print("Stopping services and removing the development volume...")
-    compose("down", "-v")
+    compose("--profile", "dev", "down", "-v", "--remove-orphans")
 
     print("Recreating PostgreSQL...")
     start_postgres()
