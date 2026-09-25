@@ -45,6 +45,9 @@ static-checks = [
 ]
 dev = "python scripts/dev.py"
 dev-reset = "python scripts/dev.py reset"
+db-upgrade = "alembic upgrade head"
+db-current = "alembic current"
+db-history = "alembic history"
 
 [build-system]
 requires = ["poetry-core"]

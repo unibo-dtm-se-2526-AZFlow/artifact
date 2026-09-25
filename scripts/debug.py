@@ -8,7 +8,13 @@ import os
 
 import uvicorn
 
-from dev import database_url, start_postgres, wait_for_postgres, compose_environment
+from dev import (
+    compose_environment,
+    database_url,
+    start_postgres,
+    upgrade_database,
+    wait_for_postgres,
+)
 from stop import listening_pids, main as stop_azflow
 
 
@@ -22,6 +28,7 @@ def main() -> None:
 
     start_postgres()
     wait_for_postgres()
+    upgrade_database()
 
     config = compose_environment()
     os.environ["AZFLOW_DATABASE_URL"] = database_url()
@@ -29,9 +36,7 @@ def main() -> None:
     print(
         f"Starting AZFlow in debug mode on http://localhost:{config['AZFLOW_API_PORT']}"
     )
-    print(
-        f"Swagger UI available at http://localhost:{config['AZFLOW_API_PORT']}/docs"
-    )
+    print(f"Swagger UI available at http://localhost:{config['AZFLOW_API_PORT']}/docs")
     uvicorn.run(
         "AZFlow.api:app",
         host=config["AZFLOW_API_HOST"],

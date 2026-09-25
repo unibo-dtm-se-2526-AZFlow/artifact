@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 from urllib.parse import quote
 
+import psycopg
 import uvicorn
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -111,7 +112,6 @@ def wait_for_postgres() -> None:
 
 def ensure_database(name: str) -> None:
     """Create a local PostgreSQL database when it does not exist."""
-    import psycopg
     from psycopg import sql
 
     admin_url = database_url("postgres")
@@ -134,17 +134,43 @@ def database_url(name: str | None = None) -> str:
     return f"postgresql://{user}:{password}@localhost:{port}/{database}"
 
 
+def migration_environment(name: str | None = None) -> dict[str, str]:
+    """Build an environment for Alembic against a local database."""
+    environment = os.environ.copy()
+    environment["AZFLOW_DATABASE_URL"] = database_url(name)
+    return environment
+
+
+def upgrade_database(name: str | None = None) -> None:
+    """Upgrade a local database to the latest Alembic revision."""
+    print("Applying database migrations...")
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=REPO_ROOT,
+        env=migration_environment(name),
+        check=True,
+    )
+
+
+def seed_database() -> None:
+    """Load development/demo data into the local development database."""
+    seed_path = (
+        REPO_ROOT / "AZFlow" / "infrastructure" / "persistence" / "seed_data.sql"
+    )
+    print("Loading development seed data...")
+    with psycopg.connect(database_url()) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(seed_path.read_text(encoding="utf-8"))
+        connection.commit()
+
+
 def run_azflow() -> None:
     """Run AZFlow locally with Uvicorn auto-reload."""
     config = compose_environment()
     os.environ["AZFLOW_DATABASE_URL"] = database_url()
 
-    print(
-        f"Starting AZFlow on http://localhost:{config['AZFLOW_API_PORT']}"
-    )
-    print(
-        f"Swagger UI available at http://localhost:{config['AZFLOW_API_PORT']}/docs"
-    )
+    print(f"Starting AZFlow on http://localhost:{config['AZFLOW_API_PORT']}")
+    print(f"Swagger UI available at http://localhost:{config['AZFLOW_API_PORT']}/docs")
     uvicorn.run(
         "AZFlow.api:app",
         host=config["AZFLOW_API_HOST"],
@@ -186,7 +212,9 @@ def reset_database() -> None:
     print("Recreating PostgreSQL...")
     start_postgres()
     wait_for_postgres()
-    print("PostgreSQL is ready. Development database has been reset.")
+    upgrade_database()
+    seed_database()
+    print("Development database has been reset, migrated, and seeded.")
 
 
 def main() -> None:
@@ -197,6 +225,7 @@ def main() -> None:
 
     start_postgres()
     wait_for_postgres()
+    upgrade_database()
     run_azflow()
     maybe_stop_postgres()
 
