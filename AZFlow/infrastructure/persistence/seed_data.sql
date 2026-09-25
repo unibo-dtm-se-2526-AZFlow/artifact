@@ -1,4 +1,4 @@
--- Development data for Patient Check-In
+-- Development/demo data for AZFlow
 -- The data matches MockAppointmentSource and uses fixed ids
 -- Agenda A has two active queues to test selection by the lowest queue id
 
@@ -58,6 +58,13 @@ INSERT INTO service_access (id, daily_presence_id, agenda_id, appointment_id, st
     (2, 2, 2, NULL, 'WAITING'),
     (3, 3, 1, NULL, 'CALLED'),
     (4, 4, 2, NULL, 'CALLED');
+
+-- Keep the daily ticket counters consistent with the seeded public call codes.
+-- Both ticket masters already used numbers 1 and 2 today, so the next
+-- check-in must receive AAA003 or BBB003.
+INSERT INTO ticket_sequence (ticket_master_id, operational_day, last_number) VALUES
+    (1, CURRENT_DATE, 2),
+    (2, CURRENT_DATE, 2);
 
 -- Location topology: a tree with no fixed levels. Company is the root; the
 -- Radiotherapy branch has two leaf nodes and a nested Brachytherapy sub-branch,
