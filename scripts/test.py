@@ -9,7 +9,13 @@ import sys
 import psycopg
 from psycopg import sql
 
-from dev import database_url, ensure_database, start_postgres, wait_for_postgres
+from dev import (
+    database_url,
+    ensure_database,
+    start_postgres,
+    upgrade_database,
+    wait_for_postgres,
+)
 
 TEST_DATABASE = "azflow_test"
 
@@ -33,8 +39,11 @@ def main() -> int:
     wait_for_postgres()
     reset_test_database()
 
+    test_database_url = database_url(TEST_DATABASE)
+    upgrade_database(TEST_DATABASE)
+
     environment = os.environ.copy()
-    environment["AZFLOW_TEST_DATABASE_URL"] = database_url(TEST_DATABASE)
+    environment["AZFLOW_TEST_DATABASE_URL"] = test_database_url
 
     return subprocess.call(
         [sys.executable, "-m", "pytest", *sys.argv[1:]],

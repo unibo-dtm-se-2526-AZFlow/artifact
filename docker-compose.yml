@@ -10,6 +10,15 @@ services:
     ports:
       - "${AZFLOW_API_PORT:-8000}:${AZFLOW_API_PORT:-8000}"
 
+  adminer:
+    image: adminer:latest
+    profiles:
+      - dev
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
   postgres:
     image: postgres:16
     environment:
@@ -20,8 +29,6 @@ services:
       - "${AZFLOW_DB_HOST_PORT:-55432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./AZFlow/infrastructure/persistence/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
-      - ./AZFlow/infrastructure/persistence/seed_data.sql:/docker-entrypoint-initdb.d/seed_data.sql:ro
 
 volumes:
   pgdata:

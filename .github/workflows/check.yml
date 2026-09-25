@@ -127,6 +127,11 @@ jobs:
       - name: Restore Development Environment
         run: poetry install
 
+      - name: Apply Database Migrations
+        env:
+          AZFLOW_DATABASE_URL: ${{ env.AZFLOW_TEST_DATABASE_URL }}
+        run: poetry run poe db-upgrade
+
       - name: Test
         run: poetry run poe test
 
