@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v1.0.0...v1.0.1) (2026-09-25)
+
+### Bug Fixes
+
+* **deploy:** include database migrations in image ([a76ea51](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/a76ea514be54feee51843d3770c57951f295f2b5))
+
 ## [1.0.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.6.0...v1.0.0) (2026-09-25)
 
 ### ⚠ BREAKING CHANGES
