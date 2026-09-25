@@ -1,3 +1,30 @@
+## [1.0.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.6.0...v1.0.0) (2026-09-25)
+
+### ⚠ BREAKING CHANGES
+
+* **db:** PostgreSQL no longer initializes the schema and seed data through Docker. Database schema changes must be applied with Alembic migrations.
+
+### Features
+
+* **compose:** add Adminer to development environment ([8e6d6e2](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/8e6d6e2b424624e275a9af2d28d7115d551a8221))
+* **db:** introduce Alembic migrations ([8074365](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/80743658bd5af9e36d9d627b0d41c6286d822d47))
+* **dev:** add stop script for local environment ([6a4a90d](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/6a4a90d723b632d67963e6d05954ad1b003f9991))
+
+### Bug Fixes
+
+* **ci:** apply migrations before integration tests ([a3949cf](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/a3949cf7e7a47daeabcf9633944076308ce80918))
+* **dev:** improve Poetry/Poe development startup ([f51bbf9](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/f51bbf9c2c0baaca010e59c6a3288ed07e3479e6))
+* **seed:** correct development seed data ([5650488](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/565048821171beab431361476e28e79f90568b9d))
+
+### Tests
+
+* **db:** validate  migrations in integration tests ([8dd0dd9](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/8dd0dd9d53141b9b8f86c63330ced5528ee03e62))
+
+### Refactoring
+
+* **db:** move database lifecycle to Alembic ([8fe9449](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/8fe9449b8d2c48b26cc8e469a2fcf3e7e3ca0c03))
+* **db:** remove legacy schema bootstrap ([c258d9e](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/c258d9e945d5045ac845eba7b7856221c7799568))
+
 ## [0.6.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v0.5.0...v0.6.0) (2026-09-23)
 
 ### Features
