@@ -16,6 +16,7 @@ fastapi = "^0.115.0"
 uvicorn = { version = "^0.30.0", extras = ["standard"] }
 psycopg = { version = "^3.2.0", extras = ["binary"] }
 pydantic-settings = "^2.5.0"
+alembic = "^1.16.0"
 
 [tool.poetry.group.dev.dependencies]
 coverage = "^7.4.0"
