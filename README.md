@@ -56,6 +56,17 @@ Start AZFlow locally:
 poetry run poe dev
 ~~~
 
+The development launcher starts PostgreSQL and Adminer, applies all pending
+Alembic migrations, and then starts AZFlow. It does not load demo data during
+a normal start.
+
+To recreate the local development database from scratch, apply the migrations,
+and load the demo data:
+
+~~~bash
+poetry run poe dev-reset
+~~~
+
 Run the portable test suite:
 
 ~~~bash
@@ -75,7 +86,35 @@ poetry run poe static-checks
 poetry run poe format-check
 ~~~
 
-Continuous integration verifies the project on the supported Python versions and operating systems, with dedicated integration tests for infrastructure adapters.
+Continuous integration verifies the project on the supported Python versions and operating systems, with dedicated integration tests for infrastructure adapters. Integration tests use a fresh PostgreSQL database and apply the Alembic migrations before running.
+
+## Database migrations
+
+Alembic is the source of truth for the PostgreSQL schema. Database schema
+changes must be introduced through migrations; PostgreSQL and Docker Compose
+do not bootstrap the schema automatically.
+
+The main migration commands are:
+
+~~~bash
+poetry run poe db-upgrade
+poetry run poe db-current
+poetry run poe db-history
+~~~
+
+These commands expect AZFLOW_DATABASE_URL to identify the target database.
+For local development, the launcher builds this URL from the PostgreSQL values
+in .env.
+
+In a deployment, migrations must be applied explicitly before starting a new
+AZFlow application version. The application image includes the Alembic
+configuration and migration files, so the same image can be used for a
+one-shot migration step and then started normally. Migrations are intentionally
+not executed by the application process at startup, avoiding concurrent
+migration attempts when multiple application instances are started.
+
+Development/demo seed data is not part of the migration lifecycle and must
+never be loaded in production.
 
 ## License
 

@@ -18,8 +18,10 @@ RUN pip install --no-cache-dir "poetry==${POETRY_VERSION}"
 COPY pyproject.toml poetry.lock README.md ./
 RUN poetry install --only main --no-root
 
-# Copy the application source and install the package itself.
+# Copy the application source and database migrations, then install the package itself.
 COPY AZFlow ./AZFlow
+COPY alembic.ini ./alembic.ini
+COPY migrations ./migrations
 RUN poetry install --only main
 
 # Default API port (overridable via AZFLOW_API_PORT).
