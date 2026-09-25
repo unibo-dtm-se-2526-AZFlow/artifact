@@ -16,6 +16,8 @@ def database_url() -> str:
     url = os.getenv("AZFLOW_DATABASE_URL")
     if not url:
         raise RuntimeError("AZFLOW_DATABASE_URL is required to run migrations")
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg://", 1)
     return url
 
 
