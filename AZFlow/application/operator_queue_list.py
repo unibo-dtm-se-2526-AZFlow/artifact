@@ -23,7 +23,7 @@ from AZFlow.domain.service_access import ServiceAccessState
 
 @dataclass(frozen=True)
 class OperatorQueueListEntry:
-    """One WAITING or SUSPENDED entry visible to the operator."""
+    """One daily ServiceAccess visible to the operator."""
 
     service_access_id: int
     public_call_code: str
