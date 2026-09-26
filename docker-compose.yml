@@ -18,10 +18,22 @@ services:
     image: adminer:latest
     profiles:
       - dev
-    ports:
-      - "8080:8080"
     depends_on:
       - postgres
+
+  demo-web:
+    image: nginx:alpine
+    profiles:
+      - dev
+    ports:
+      - "80:80"
+    volumes:
+      - ./dev/demo_clients:/usr/share/nginx/html:ro
+      - ./dev/demo_web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - adminer
 
   postgres:
     image: postgres:16

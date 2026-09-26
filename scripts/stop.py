@@ -1,4 +1,4 @@
-"""Stop a running local AZFlow API instance without touching unrelated software."""
+"""Stop the local AZFlow development environment without deleting data."""
 
 from __future__ import annotations
 
@@ -63,39 +63,54 @@ def is_azflow_process(pid: int) -> bool:
 
 
 def main() -> int:
-    """Stop AZFlow only when every listener on its port is recognized."""
+    """Stop AZFlow and all Docker services used by the development environment."""
     config = compose_environment()
     port = int(config["AZFLOW_API_PORT"])
     pids = listening_pids(port)
 
     if not pids:
         print(f"No process is listening on AZFlow port {port}.")
-        return 0
+    else:
+        unknown = {pid for pid in pids if not is_azflow_process(pid)}
+        if unknown:
+            details = "; ".join(
+                f"PID {pid}: {process_command(pid) or 'unknown command'}"
+                for pid in sorted(unknown)
+            )
+            print(
+                f"Port {port} is in use by a process not recognized as AZFlow. "
+                f"Refusing to stop it. {details}"
+            )
+            return 1
 
-    unknown = {pid for pid in pids if not is_azflow_process(pid)}
-    if unknown:
-        details = "; ".join(
-            f"PID {pid}: {process_command(pid) or 'unknown command'}"
-            for pid in sorted(unknown)
+        # Stop the reload parent before its worker when both own the socket.
+        ordered = sorted(
+            pids,
+            key=lambda pid: "scripts/dev.py" not in process_command(pid),
         )
-        print(
-            f"Port {port} is in use by a process not recognized as AZFlow. "
-            f"Refusing to stop it. {details}"
-        )
-        return 1
+        for pid in ordered:
+            try:
+                os.kill(pid, signal.SIGTERM)
+                print(f"Stopped AZFlow process PID {pid}.")
+            except ProcessLookupError:
+                pass
 
-    # Stop the reload parent before its worker when both own the socket.
-    ordered = sorted(
-        pids,
-        key=lambda pid: "scripts/dev.py" not in process_command(pid),
+    print("Stopping demo gateway, Adminer, and PostgreSQL...")
+    subprocess.run(
+        [
+            "docker",
+            "compose",
+            "--profile",
+            "dev",
+            "stop",
+            "demo-web",
+            "adminer",
+            "postgres",
+        ],
+        cwd=REPO_ROOT,
+        check=True,
     )
-    for pid in ordered:
-        try:
-            os.kill(pid, signal.SIGTERM)
-            print(f"Stopped AZFlow process PID {pid}.")
-        except ProcessLookupError:
-            pass
-
+    print("Development environment stopped. Database data was preserved.")
     return 0
 
 

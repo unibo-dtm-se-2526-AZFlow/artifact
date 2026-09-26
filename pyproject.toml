@@ -28,26 +28,24 @@ ruff = "^0.15.0"
 httpx = "^0.28.1"
 
 [tool.poe.tasks]
-test = "pytest"
-test-integration = "python scripts/test.py"
-coverage = "coverage run -m pytest"
-coverage-report = "coverage report -m"
-coverage-html = "coverage html"
-ruff-check = "ruff check"
-ruff-fix = "ruff check --fix"
-format = "ruff format"
-format-check = "ruff format --check"
-mypy = "mypy AZFlow tests"
-compile = "python -m compileall AZFlow tests"
-static-checks = [
-    "ruff-check",
-    "mypy",
-]
-dev = "python scripts/dev.py"
-dev-reset = "python scripts/dev.py reset"
-db-upgrade = "alembic upgrade head"
-db-current = "alembic current"
-db-history = "alembic history"
+test = { cmd = "pytest", help = "Run the unit test suite" }
+test-integration = { cmd = "python scripts/test.py", help = "Run integration tests against a disposable database" }
+coverage = { cmd = "coverage run -m pytest", help = "Run tests and collect coverage data" }
+coverage-report = { cmd = "coverage report -m", help = "Show the coverage report" }
+coverage-html = { cmd = "coverage html", help = "Generate the HTML coverage report" }
+ruff-check = { cmd = "ruff check", help = "Check Python code with Ruff" }
+ruff-fix = { cmd = "ruff check --fix", help = "Fix Ruff issues when possible" }
+format = { cmd = "ruff format", help = "Format Python code with Ruff" }
+format-check = { cmd = "ruff format --check", help = "Check Python formatting with Ruff" }
+mypy = { cmd = "mypy AZFlow tests", help = "Run static type checks" }
+compile = { cmd = "python -m compileall AZFlow tests", help = "Compile Python sources to check syntax" }
+static-checks = { sequence = ["ruff-check", "mypy"], help = "Run linting and static type checks" }
+dev = { cmd = "python scripts/dev.py", help = "Start PostgreSQL, Adminer, demo gateway, and AZFlow for development" }
+dev-reset = { cmd = "python scripts/dev.py reset", help = "Recreate, migrate, and seed the development database (deletes existing data)" }
+dev-stop = { cmd = "python scripts/stop.py", help = "Stop AZFlow and all development services without deleting database data" }
+db-upgrade = { cmd = "alembic upgrade head", help = "Upgrade the configured database to the latest migration" }
+db-current = { cmd = "alembic current", help = "Show the current database migration revision" }
+db-history = { cmd = "alembic history", help = "Show the database migration history" }
 
 [build-system]
 requires = ["poetry-core"]
