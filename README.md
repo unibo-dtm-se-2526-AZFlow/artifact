@@ -102,16 +102,21 @@ poetry run poe db-current
 poetry run poe db-history
 ~~~
 
-These commands expect AZFLOW_DATABASE_URL to identify the target database.
-For local development, the launcher builds this URL from the PostgreSQL values
-in .env.
+AZFlow uses the PostgreSQL settings from the environment or `.env`:
+`POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
+and `POSTGRES_DB`. The connection URL is built internally.
 
 In a deployment, migrations must be applied explicitly before starting a new
-AZFlow application version. The application image includes the Alembic
-configuration and migration files, so the same image can be used for a
-one-shot migration step and then started normally. Migrations are intentionally
-not executed by the application process at startup, avoiding concurrent
-migration attempts when multiple application instances are started.
+AZFlow application version. Migration files are part of the AZFlow Python
+package and can also be applied from an installed release with:
+
+~~~bash
+python -m AZFlow.migrations upgrade
+~~~
+
+Migrations are intentionally not executed by the application process at
+startup, avoiding concurrent migration attempts when multiple application
+instances are started.
 
 Development/demo seed data is not part of the migration lifecycle and must
 never be loaded in production.

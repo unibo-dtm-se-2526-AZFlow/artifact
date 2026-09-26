@@ -114,6 +114,11 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: azflow
+      POSTGRES_PASSWORD: azflow
+      POSTGRES_DB: azflow_test
       AZFLOW_TEST_DATABASE_URL: postgresql://azflow:azflow@localhost:5432/azflow_test
     steps:
       - name: Checkout Code
@@ -128,8 +133,6 @@ jobs:
         run: poetry install
 
       - name: Apply Database Migrations
-        env:
-          AZFLOW_DATABASE_URL: ${{ env.AZFLOW_TEST_DATABASE_URL }}
         run: poetry run poe db-upgrade
 
       - name: Test
