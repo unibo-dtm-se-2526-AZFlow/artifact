@@ -231,6 +231,11 @@ class FakeCallRepository:
         self.try_call_room_ids.append(room_id)
         return self._store.try_call(service_access_id, room_id)
 
+    def try_call_suspended(
+        self, service_access_id: int, room_id: int
+    ) -> Optional[ServiceAccess]:
+        return None
+
 
 class RecordingPublisher:
     """CallEventPublisher fake recording every published event."""

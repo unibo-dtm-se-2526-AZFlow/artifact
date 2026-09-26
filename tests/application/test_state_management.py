@@ -22,6 +22,7 @@ from AZFlow.application.errors import (
     ServiceAccessNotRestorableError,
     ServiceAccessNotSuspendableError,
 )
+from AZFlow.application.ports.display_state_event_publisher import DisplayStateEvent
 from AZFlow.application.ports.state_transition_repository import AdmissionOutcome
 from AZFlow.application.state_management import (
     StateChangeResult,
@@ -416,9 +417,9 @@ def test_confirm_admission_concurrency_miss_reports_not_admittable_and_no_transi
 
 class FakeDisplayPublisher:
     def __init__(self) -> None:
-        self.events = []
+        self.events: List[DisplayStateEvent] = []
 
-    def publish_state(self, event) -> None:
+    def publish_state(self, event: DisplayStateEvent) -> None:
         self.events.append(event)
 
 
