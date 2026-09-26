@@ -15,6 +15,8 @@ from pydantic import BaseModel
 from AZFlow.application.errors import (
     ServiceAccessNotAdmittableError,
     ServiceAccessNotFoundError,
+    ServiceAccessNotCancellableError,
+    ServiceAccessNotRecallableError,
     ServiceAccessNotRestorableError,
     ServiceAccessNotSuspendableError,
 )
@@ -106,6 +108,54 @@ def restore(
             detail="service access is not restorable",
         ) from error
 
+    return _to_response(result)
+
+
+@router.post(
+    "/service-accesses/{service_access_id}/cancel-call",
+    response_model=StateChangeResponse,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+)
+def cancel_call(
+    service_access_id: int = Path(..., gt=0),
+    service: StateManagementService = Depends(get_state_management_service),
+) -> StateChangeResponse:
+    """Cancel a CALLED ServiceAccess and return it to WAITING."""
+    try:
+        result = service.cancel_call(service_access_id)
+    except ServiceAccessNotFoundError as error:
+        raise HTTPException(
+            status_code=404, detail="service access not found"
+        ) from error
+    except ServiceAccessNotCancellableError as error:
+        raise HTTPException(
+            status_code=409, detail="service access is not cancellable"
+        ) from error
+    return _to_response(result)
+
+
+@router.post(
+    "/service-accesses/{service_access_id}/recall",
+    response_model=StateChangeResponse,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+)
+def recall(
+    service_access_id: int = Path(..., gt=0),
+    service: StateManagementService = Depends(get_state_management_service),
+) -> StateChangeResponse:
+    """Recall an ADMITTED ServiceAccess to its persisted Room."""
+    try:
+        result = service.recall(service_access_id)
+    except ServiceAccessNotFoundError as error:
+        raise HTTPException(
+            status_code=404, detail="service access not found"
+        ) from error
+    except ServiceAccessNotRecallableError as error:
+        raise HTTPException(
+            status_code=409, detail="service access is not recallable"
+        ) from error
     return _to_response(result)
 
 

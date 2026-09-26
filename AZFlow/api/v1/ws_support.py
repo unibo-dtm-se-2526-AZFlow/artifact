@@ -54,7 +54,7 @@ class WebSocketDisplaySupport:
             calls = read_model.recent_calls_for_monitor(
                 waiting_room_monitor_id, date.today()
             )
-        return [display_call_json(call) for call in calls]
+        return [display_call_json(call, include_agenda=False) for call in calls]
 
     def latest_call_snapshot(self, room_monitor_id: int) -> List[Dict[str, Any]]:
         """Return the latest-call snapshot as zero or one JSON item."""

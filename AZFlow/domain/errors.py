@@ -33,3 +33,11 @@ class ServiceAccessNotCalledError(DomainError):
     def __init__(self, service_access_id: int) -> None:
         super().__init__()
         self.service_access_id = service_access_id
+
+
+class ServiceAccessNotAdmittedError(DomainError):
+    """Raised when a ServiceAccess is recalled while not ADMITTED."""
+
+    def __init__(self, service_access_id: int) -> None:
+        super().__init__()
+        self.service_access_id = service_access_id

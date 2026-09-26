@@ -83,11 +83,11 @@ _ROOM_1 = "ROOM-1"
 _ROOM_2 = "ROOM-2"
 _ALLOWED_FIELDS = {
     "public_call_code",
-    "agenda",
     "state",
     "room_reference",
     "room_label",
     "occurred_at",
+    "scheduled_at",
 }
 
 
@@ -162,7 +162,7 @@ def wired_client(connection, dsn: str) -> Iterator[TestClient]:
     def provide_state_management() -> Iterator[StateManagementService]:
         with psycopg.connect(dsn) as request_connection:
             repository = PostgresStateTransitionRepository(request_connection)
-            yield StateManagementService(repository)
+            yield StateManagementService(repository, hub)
 
     app.state.ws_call_hub = hub
     set_ws_support(app, WebSocketDisplaySupport(hub, open_read_model))
@@ -211,8 +211,9 @@ def _first_waiting_id(connection, exclude: int) -> int:
     return row[0]
 
 
-def _assert_non_identifying(call: dict) -> None:
-    assert set(call.keys()) == _ALLOWED_FIELDS
+def _assert_non_identifying(call: dict, *, room: bool = False) -> None:
+    expected = _ALLOWED_FIELDS | ({"agenda"} if room else set())
+    assert set(call.keys()) == expected
     assert _IDENTIFIER_VALUE not in str(call)
     assert _IDENTIFIER_VALUE_2 not in str(call)
     assert "patient" not in str(call).lower()
@@ -314,7 +315,7 @@ def test_live_call_reaches_in_scope_and_not_out_of_scope(wired_client):
         assert covered_msg["call"]["public_call_code"] == body["public_call_code"]
         assert covered_msg["call"]["room_reference"] == _ROOM_1
         _assert_non_identifying(covered_msg["call"])
-        _assert_non_identifying(room_msg["call"])
+        _assert_non_identifying(room_msg["call"], room=True)
 
         # A second Patient is called into ROOM-2, which the Oncology monitor
         # covers. Its first live message must be that ROOM-2 call, proving the
@@ -425,3 +426,57 @@ def test_two_calls_same_room_resolve_to_their_own_events(wired_client):
         # first event is not overwritten by the second (latest) call's data.
         assert first_msg["call"]["public_call_code"] == first["public_call_code"]
         assert second_msg["call"]["public_call_code"] == second["public_call_code"]
+
+
+def test_admit_recall_and_cancel_refresh_display_state(wired_client):
+    """Display events follow the CALLED/ADMITTED/CALLED/WAITING loop."""
+    seeded = wired_client.seeded
+    _check_in(wired_client)
+    called = _call_next(wired_client, seeded.queue_id, _ROOM_1)
+    access_id = called["service_access_id"]
+
+    with (
+        wired_client.websocket_connect(
+            f"/api/v1/ws/waiting-room-monitors/{seeded.wrm_id}"
+        ) as waiting,
+        wired_client.websocket_connect(
+            f"/api/v1/ws/room-monitors/{seeded.room_monitor_id}"
+        ) as room,
+    ):
+        assert waiting.receive_json()["type"] == "snapshot"
+        assert room.receive_json()["type"] == "snapshot"
+
+        admitted = wired_client.post(f"/api/v1/service-accesses/{access_id}/admission")
+        assert admitted.status_code == 200
+        waiting_state = waiting.receive_json()
+        room_state = room.receive_json()
+        assert waiting_state["type"] == "state"
+        assert waiting_state["call"]["state"] == "ADMITTED"
+        assert room_state["type"] == "state"
+
+        recalled = wired_client.post(f"/api/v1/service-accesses/{access_id}/recall")
+        assert recalled.status_code == 200
+        assert waiting.receive_json()["type"] == "call"
+        assert room.receive_json()["type"] == "call"
+
+        cancelled = wired_client.post(
+            f"/api/v1/service-accesses/{access_id}/cancel-call"
+        )
+        assert cancelled.status_code == 200
+        waiting_state = waiting.receive_json()
+        room_state = room.receive_json()
+        assert waiting_state["type"] == "state"
+        assert waiting_state["call"]["state"] == "WAITING"
+        assert room_state["type"] == "state"
+
+    with wired_client.websocket_connect(
+        f"/api/v1/ws/room-monitors/{seeded.room_monitor_id}"
+    ) as room:
+        snapshot = room.receive_json()
+        assert snapshot == {"type": "snapshot", "calls": []}
+
+    with wired_client.websocket_connect(
+        f"/api/v1/ws/waiting-room-monitors/{seeded.wrm_id}"
+    ) as waiting:
+        snapshot = waiting.receive_json()
+        assert snapshot["calls"][0]["state"] == "WAITING"

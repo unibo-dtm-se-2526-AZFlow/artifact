@@ -15,8 +15,14 @@ from typing import NoReturn, Optional
 from AZFlow.application.errors import (
     ServiceAccessNotAdmittableError,
     ServiceAccessNotFoundError,
+    ServiceAccessNotCancellableError,
+    ServiceAccessNotRecallableError,
     ServiceAccessNotRestorableError,
     ServiceAccessNotSuspendableError,
+)
+from AZFlow.application.ports.display_state_event_publisher import (
+    DisplayStateEvent,
+    DisplayStateEventPublisher,
 )
 from AZFlow.application.ports.state_transition_repository import (
     AdmissionOutcome,
@@ -51,8 +57,13 @@ class StateManagementService:
     lookup into a distinguishable not-found or not-in-expected-state outcome.
     """
 
-    def __init__(self, repository: StateTransitionRepository) -> None:
+    def __init__(
+        self,
+        repository: StateTransitionRepository,
+        display_publisher: Optional[DisplayStateEventPublisher] = None,
+    ) -> None:
         self._repository = repository
+        self._display_publisher = display_publisher
 
     def suspend(self, service_access_id: int) -> StateChangeResult:
         """Suspend a WAITING ServiceAccess.
@@ -78,6 +89,24 @@ class StateManagementService:
             return self._result(restored)
         self._reject_miss(service_access_id, ServiceAccessNotRestorableError)
 
+    def cancel_call(self, service_access_id: int) -> StateChangeResult:
+        """Return a CALLED ServiceAccess to WAITING."""
+        outcome = self._repository.try_cancel_call(service_access_id)
+        if outcome is not None:
+            result = self._admission_result(outcome)
+            self._publish_display_state(result)
+            return result
+        self._reject_miss(service_access_id, ServiceAccessNotCancellableError)
+
+    def recall(self, service_access_id: int) -> StateChangeResult:
+        """Recall an ADMITTED ServiceAccess to its persisted Room."""
+        outcome = self._repository.try_recall(service_access_id)
+        if outcome is not None:
+            result = self._admission_result(outcome)
+            self._publish_display_state(result)
+            return result
+        self._reject_miss(service_access_id, ServiceAccessNotRecallableError)
+
     def confirm_admission(self, service_access_id: int) -> StateChangeResult:
         """Confirm admission of a CALLED ServiceAccess into its call-time Room.
 
@@ -90,8 +119,25 @@ class StateManagementService:
         """
         outcome = self._repository.try_admit(service_access_id)
         if outcome is not None:
-            return self._admission_result(outcome)
+            result = self._admission_result(outcome)
+            self._publish_display_state(result)
+            return result
         self._reject_miss(service_access_id, ServiceAccessNotAdmittableError)
+
+    def _publish_display_state(self, result: StateChangeResult) -> None:
+        """Publish a state change that affects Room and waiting-room displays."""
+        if result.room_reference is None:
+            return
+        if self._display_publisher is None:
+            return
+        self._display_publisher.publish_state(
+            DisplayStateEvent(
+                public_call_code=result.public_call_code,
+                service_access_id=result.service_access_id,
+                state=result.state,
+                room_reference=result.room_reference,
+            )
+        )
 
     @staticmethod
     def _result(service_access: ServiceAccess) -> StateChangeResult:

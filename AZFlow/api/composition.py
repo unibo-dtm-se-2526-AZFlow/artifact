@@ -313,12 +313,12 @@ def wire_calling(application: FastAPI) -> None:
 
 def build_state_management_service_provider(
     database_url: object,
+    display_publisher: WebSocketCallHub,
 ) -> Callable[[], Iterator[StateManagementService]]:
     """Build the StateManagementService dependency used for each request
 
-    Each request gets a new PostgreSQL connection. Suspend, restore and confirm
-    admission publish no event, so no publisher is created. A missing database
-    URL returns HTTP 503.
+    Each request gets a new PostgreSQL connection. Display-relevant state
+    changes are published through the shared WebSocket hub.
     """
 
     def provide_state_management_service() -> Iterator[StateManagementService]:
@@ -333,7 +333,7 @@ def build_state_management_service_provider(
 
         with psycopg.connect(str(database_url)) as connection:
             repository = PostgresStateTransitionRepository(connection)
-            yield StateManagementService(repository)
+            yield StateManagementService(repository, display_publisher)
 
     return provide_state_management_service
 
@@ -345,5 +345,7 @@ def wire_state_management(application: FastAPI) -> None:
     """
     settings = load_settings()
     application.dependency_overrides[get_state_management_service] = (
-        build_state_management_service_provider(settings.database_url)
+        build_state_management_service_provider(
+            settings.database_url, application.state.ws_call_hub
+        )
     )

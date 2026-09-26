@@ -29,6 +29,7 @@ _ALLOWED_FIELDS = {
     "room_reference",
     "room_label",
     "occurred_at",
+    "scheduled_at",
 }
 _WEBSOCKET_TOKENS = ("websocket", "starlette.websockets")
 PATIENT_IDENTIFIER = "RSSMRA80A01H501U"

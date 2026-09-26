@@ -25,6 +25,7 @@ from datetime import date
 from typing import Any, Callable, ContextManager, Dict, List, Optional, Set
 
 from AZFlow.application.ports.call_event_publisher import CallEvent
+from AZFlow.application.ports.display_state_event_publisher import DisplayStateEvent
 from AZFlow.application.ports.display_read_model import DisplayCall, DisplayReadModel
 
 _logger = logging.getLogger(__name__)
@@ -57,16 +58,21 @@ def room_key(monitor_id: int) -> MonitorKey:
     return MonitorKey(kind="room", monitor_id=monitor_id)
 
 
-def display_call_json(call: DisplayCall) -> Dict[str, Any]:
-    """Serialise a DisplayCall to its non-identifying JSON shape."""
-    return {
+def display_call_json(
+    call: DisplayCall, *, include_agenda: bool = True
+) -> Dict[str, Any]:
+    """Serialise a DisplayCall, optionally omitting Agenda data."""
+    payload: Dict[str, Any] = {
         "public_call_code": call.public_call_code,
-        "agenda": {"id": call.agenda.id, "name": call.agenda.name},
         "state": call.state.value,
         "room_reference": call.room_reference,
         "room_label": call.room_label,
         "occurred_at": call.occurred_at.isoformat(),
+        "scheduled_at": call.scheduled_at.isoformat() if call.scheduled_at else None,
     }
+    if include_agenda:
+        payload["agenda"] = {"id": call.agenda.id, "name": call.agenda.name}
+    return payload
 
 
 class WebSocketCallHub:
@@ -128,6 +134,32 @@ class WebSocketCallHub:
                 queues.extend(self._connections.get(key, set()))
             return queues
 
+    def publish_state(self, event: DisplayStateEvent) -> None:
+        """Deliver a display-relevant state change to covered monitors."""
+        if self._loop is None or not self._has_connections():
+            return
+        operational_day = date.today()
+        with self._read_model_factory() as read_model:
+            waiting_ids = read_model.waiting_room_monitor_ids_for_room(
+                event.room_reference
+            )
+            room_ids = read_model.room_monitor_ids_for_room(event.room_reference)
+            display_call = read_model.display_call_for_service_access(
+                event.service_access_id, operational_day
+            )
+        if display_call is None:
+            return
+        message_type = "call" if event.state.value == "CALLED" else "state"
+        message = {"type": message_type, "call": display_call_json(display_call)}
+        waiting_message = {
+            "type": message_type,
+            "call": display_call_json(display_call, include_agenda=False),
+        }
+        for queue in self._queues_for([waiting_room_key(i) for i in waiting_ids]):
+            self._loop.call_soon_threadsafe(queue.put_nowait, waiting_message)
+        for queue in self._queues_for([room_key(i) for i in room_ids]):
+            self._loop.call_soon_threadsafe(queue.put_nowait, message)
+
     def publish(self, event: CallEvent) -> None:
         """Deliver one successful call to every covered connection.
 
@@ -164,10 +196,12 @@ class WebSocketCallHub:
 
         message = {"type": "call", "call": display_call_json(display_call)}
 
-        keys: List[MonitorKey] = [waiting_room_key(i) for i in waiting_ids]
-        keys += [room_key(i) for i in room_ids]
-
-        # Snapshot the target queues under the lock, then release it before
-        # scheduling the non-blocking enqueue on the event loop.
-        for queue in self._queues_for(keys):
+        waiting_message = {
+            "type": "call",
+            "call": display_call_json(display_call, include_agenda=False),
+        }
+        # Snapshot target queues under the lock, then enqueue without holding it.
+        for queue in self._queues_for([waiting_room_key(i) for i in waiting_ids]):
+            self._loop.call_soon_threadsafe(queue.put_nowait, waiting_message)
+        for queue in self._queues_for([room_key(i) for i in room_ids]):
             self._loop.call_soon_threadsafe(queue.put_nowait, message)

@@ -10,6 +10,7 @@ from AZFlow.domain.agenda import Agenda
 from AZFlow.domain.appointment import Appointment
 from AZFlow.domain.daily_presence import DailyPresence
 from AZFlow.domain.errors import (
+    ServiceAccessNotAdmittedError,
     ServiceAccessNotCalledError,
     ServiceAccessNotSuspendedError,
     ServiceAccessNotWaitingError,
@@ -69,6 +70,18 @@ class ServiceAccess:
         if self.state is not ServiceAccessState.SUSPENDED:
             raise ServiceAccessNotSuspendedError(self.id)
         return replace(self, state=ServiceAccessState.WAITING)
+
+    def cancelled_call(self) -> "ServiceAccess":
+        """Return a CALLED access to WAITING."""
+        if self.state is not ServiceAccessState.CALLED:
+            raise ServiceAccessNotCalledError(self.id)
+        return replace(self, state=ServiceAccessState.WAITING)
+
+    def recalled(self) -> "ServiceAccess":
+        """Return an ADMITTED access to CALLED."""
+        if self.state is not ServiceAccessState.ADMITTED:
+            raise ServiceAccessNotAdmittedError(self.id)
+        return replace(self, state=ServiceAccessState.CALLED)
 
     def admitted(self) -> "ServiceAccess":
         """Return a copy in ADMITTED state.

@@ -162,3 +162,13 @@ def test_admitted_has_no_outbound_transition():
         admitted.suspended()
     with pytest.raises(ServiceAccessNotSuspendedError):
         admitted.restored()
+
+
+def test_cancelled_call_returns_called_access_to_waiting():
+    called = _waiting_service_access().called()
+    assert called.cancelled_call().state is ServiceAccessState.WAITING
+
+
+def test_recalled_returns_admitted_access_to_called():
+    admitted = _waiting_service_access().called().admitted()
+    assert admitted.recalled().state is ServiceAccessState.CALLED
