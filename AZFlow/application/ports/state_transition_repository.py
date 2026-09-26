@@ -60,8 +60,8 @@ class StateTransitionRepository(Protocol):
         """
         ...
 
-    def try_cancel_call(self, service_access_id: int) -> Optional[ServiceAccess]:
-        """Try the CALLED to WAITING transition."""
+    def try_cancel_call(self, service_access_id: int) -> Optional[AdmissionOutcome]:
+        """Try CALLED to WAITING and return the persisted call-time Room."""
         ...
 
     def try_recall(self, service_access_id: int) -> Optional[AdmissionOutcome]:

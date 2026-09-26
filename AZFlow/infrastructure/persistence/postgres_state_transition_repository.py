@@ -53,40 +53,31 @@ class PostgresStateTransitionRepository:
             ServiceAccessState.WAITING,
         )
 
-    def try_cancel_call(self, service_access_id: int) -> Optional[ServiceAccess]:
-        """Try the CALLED to WAITING transition."""
-        return self._try_transition(
+    def try_cancel_call(self, service_access_id: int) -> Optional[AdmissionOutcome]:
+        """Try CALLED to WAITING and return the persisted call-time Room."""
+        return self._try_room_transition(
             service_access_id, ServiceAccessState.CALLED, ServiceAccessState.WAITING
         )
 
     def try_recall(self, service_access_id: int) -> Optional[AdmissionOutcome]:
-        """Try the ADMITTED to CALLED transition and return its Room."""
-        recalled = self._try_transition(
+        """Try ADMITTED to CALLED and return the persisted call-time Room."""
+        return self._try_room_transition(
             service_access_id, ServiceAccessState.ADMITTED, ServiceAccessState.CALLED
         )
-        if recalled is None:
-            return None
-        try:
-            with self._conn.cursor() as cursor:
-                cursor.execute(
-                    "SELECT room_id FROM service_access WHERE id = %s",
-                    (service_access_id,),
-                )
-                room_id = cursor.fetchone()[0]
-                room_reference, room_label = self._read_room(cursor, room_id)
-            self._conn.commit()
-        except Exception:
-            self._conn.rollback()
-            raise
-        return AdmissionOutcome(recalled, room_reference, room_label)
 
     def try_admit(self, service_access_id: int) -> Optional[AdmissionOutcome]:
-        """Try the CALLED to ADMITTED transition of one ServiceAccess.
+        """Try CALLED to ADMITTED and return the persisted call-time Room."""
+        return self._try_room_transition(
+            service_access_id, ServiceAccessState.CALLED, ServiceAccessState.ADMITTED
+        )
 
-        Reuses the room_id stored at call time. On a hit it also reads that
-        Room's reference and label in the same transaction and returns them in
-        an AdmissionOutcome. Return None when it was no longer CALLED.
-        """
+    def _try_room_transition(
+        self,
+        service_access_id: int,
+        expected_state: ServiceAccessState,
+        target_state: ServiceAccessState,
+    ) -> Optional[AdmissionOutcome]:
+        """Atomically change state, record history and resolve the call-time Room."""
         try:
             with self._conn.cursor() as cursor:
                 cursor.execute(
@@ -94,38 +85,24 @@ class PostgresStateTransitionRepository:
                     UPDATE service_access
                     SET state = %s
                     WHERE id = %s AND state = %s
-                    RETURNING id, daily_presence_id, agenda_id, appointment_id,
-                              room_id
+                    RETURNING id, daily_presence_id, agenda_id, appointment_id, room_id
                     """,
-                    (
-                        ServiceAccessState.ADMITTED.value,
-                        service_access_id,
-                        ServiceAccessState.CALLED.value,
-                    ),
+                    (target_state.value, service_access_id, expected_state.value),
                 )
                 updated = cursor.fetchone()
                 if updated is None:
                     self._conn.commit()
                     return None
-
-                (
-                    access_id,
-                    daily_presence_id,
-                    agenda_id,
-                    appointment_id,
-                    room_id,
-                ) = updated
+                access_id, daily_presence_id, agenda_id, appointment_id, room_id = (
+                    updated
+                )
                 cursor.execute(
                     """
                     INSERT INTO service_access_transition
                         (service_access_id, previous_state, resulting_state)
                     VALUES (%s, %s, %s)
                     """,
-                    (
-                        access_id,
-                        ServiceAccessState.CALLED.value,
-                        ServiceAccessState.ADMITTED.value,
-                    ),
+                    (access_id, expected_state.value, target_state.value),
                 )
                 room_reference, room_label = self._read_room(cursor, room_id)
                 daily_presence = load_daily_presence(cursor, daily_presence_id)
@@ -139,16 +116,14 @@ class PostgresStateTransitionRepository:
         except Exception:
             self._conn.rollback()
             raise
-
-        service_access = ServiceAccess(
-            id=access_id,
-            daily_presence=daily_presence,
-            agenda=agenda,
-            appointment=appointment,
-            state=ServiceAccessState.ADMITTED,
-        )
         return AdmissionOutcome(
-            service_access=service_access,
+            service_access=ServiceAccess(
+                id=access_id,
+                daily_presence=daily_presence,
+                agenda=agenda,
+                appointment=appointment,
+                state=target_state,
+            ),
             room_reference=room_reference,
             room_label=room_label,
         )

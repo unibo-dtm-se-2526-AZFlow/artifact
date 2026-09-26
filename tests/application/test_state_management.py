@@ -118,13 +118,16 @@ class FakeStateTransitionRepository:
             lambda access: access.restored(),
         )
 
-    def try_cancel_call(self, service_access_id: int) -> Optional[ServiceAccess]:
+    def try_cancel_call(self, service_access_id: int) -> Optional[AdmissionOutcome]:
         self.try_cancel_call_ids.append(service_access_id)
-        return self._try_transition(
+        cancelled = self._try_transition(
             service_access_id,
             ServiceAccessState.CALLED,
             lambda access: access.cancelled_call(),
         )
+        if cancelled is None:
+            return None
+        return AdmissionOutcome(cancelled, _ROOM_REFERENCE, _ROOM_LABEL)
 
     def try_recall(self, service_access_id: int) -> Optional[AdmissionOutcome]:
         self.try_recall_ids.append(service_access_id)
@@ -408,53 +411,50 @@ def test_confirm_admission_concurrency_miss_reports_not_admittable_and_no_transi
     assert repository.find_state(40) is ServiceAccessState.ADMITTED
 
 
-# --- suspend, restore and admission publish no notification (Property 11) ---
-# Validates: Requirements 9.5, 13.1, 13.2, 13.3, 13.4
+# --- display-relevant transitions publish notifications ----------------------
 
 
-def test_service_takes_only_the_repository_and_holds_no_publisher():
-    # StateManagementService has no notification seam: construction requires
-    # only the repository, so suspend/restore/admission cannot emit any event.
-    parameters = inspect.signature(StateManagementService.__init__).parameters
-    assert list(parameters) == ["self", "repository"]
-    assert not any(
-        "publish" in name or "event" in name or "notif" in name for name in parameters
+class FakeDisplayPublisher:
+    def __init__(self) -> None:
+        self.events = []
+
+    def publish_state(self, event) -> None:
+        self.events.append(event)
+
+
+def test_admission_cancel_and_recall_publish_display_state():
+    publisher = FakeDisplayPublisher()
+    repository = FakeStateTransitionRepository(
+        [
+            _service_access(40, ServiceAccessState.CALLED),
+            _service_access(41, ServiceAccessState.CALLED),
+            _service_access(42, ServiceAccessState.ADMITTED),
+        ]
     )
+    service = StateManagementService(repository, publisher)
+    service.confirm_admission(40)
+    service.cancel_call(41)
+    service.recall(42)
+    assert [event.state for event in publisher.events] == [
+        ServiceAccessState.ADMITTED,
+        ServiceAccessState.WAITING,
+        ServiceAccessState.CALLED,
+    ]
+    assert all(event.room_reference == _ROOM_REFERENCE for event in publisher.events)
 
-    repository = FakeStateTransitionRepository()
-    service = StateManagementService(repository)
-    assert not any(
-        "publish" in name or "event" in name or "notif" in name
-        for name in vars(service)
+
+def test_suspend_and_restore_do_not_publish_display_state():
+    publisher = FakeDisplayPublisher()
+    repository = FakeStateTransitionRepository(
+        [
+            _service_access(40, ServiceAccessState.WAITING),
+            _service_access(41, ServiceAccessState.SUSPENDED),
+        ]
     )
-
-
-def _publisher_probe(service: StateManagementService) -> None:
-    """Fail if the service holds anything that looks like a publisher.
-
-    The service takes no publisher dependency, so a spy cannot be injected.
-    Instead we assert the structural fact: no publisher-like collaborator is
-    stored, which means none of the operations can emit a CallEvent or a
-    display notification.
-    """
-    for value in vars(service).values():
-        assert not hasattr(value, "publish"), "unexpected publisher on the service"
-
-
-def test_suspend_restore_admission_emit_no_notification():
-    waiting = _service_access(40, ServiceAccessState.WAITING)
-    suspended = _service_access(41, ServiceAccessState.SUSPENDED)
-    called = _service_access(42, ServiceAccessState.CALLED)
-    service, _repository = _service([waiting, suspended, called])
-
-    # Each operation returns its result; none reaches a publisher because the
-    # service holds none.
-    assert service.suspend(40).state is ServiceAccessState.SUSPENDED
-    _publisher_probe(service)
-    assert service.restore(41).state is ServiceAccessState.WAITING
-    _publisher_probe(service)
-    assert service.confirm_admission(42).state is ServiceAccessState.ADMITTED
-    _publisher_probe(service)
+    service = StateManagementService(repository, publisher)
+    service.suspend(40)
+    service.restore(41)
+    assert publisher.events == []
 
 
 def test_cancel_call_transitions_called_to_waiting():

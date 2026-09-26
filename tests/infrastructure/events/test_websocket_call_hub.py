@@ -192,6 +192,7 @@ def test_publish_message_carries_only_non_identifying_fields():
         "room_reference",
         "room_label",
         "occurred_at",
+        "scheduled_at",
     }
     assert PATIENT_IDENTIFIER not in str(call)
     assert "patient" not in str(call).lower()
@@ -281,3 +282,48 @@ def test_registry_access_is_thread_safe_under_concurrent_registration():
     assert errors == [], f"thread-safety errors: {errors}"
     # The stable connection received at least one message and the run finished.
     assert not stable.empty()
+
+
+def test_publish_state_sends_state_message_for_admission():
+    from AZFlow.application.ports.display_state_event_publisher import DisplayStateEvent
+
+    call = DisplayCall(
+        public_call_code="AAA001",
+        agenda=Agenda(id=3, name="Cardiology"),
+        state=ServiceAccessState.ADMITTED,
+        room_reference="ROOM-1",
+        room_label="Room 1",
+        occurred_at=_OCCURRED_AT,
+    )
+    read_model = _FakeReadModel([5], [9], {7: call})
+    hub = WebSocketCallHub(_factory(read_model), loop=_ImmediateLoop())
+    waiting_queue: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue()
+    room_queue: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue()
+    hub.register(waiting_room_key(5), waiting_queue)
+    hub.register(room_key(9), room_queue)
+
+    hub.publish_state(
+        DisplayStateEvent("AAA001", 7, ServiceAccessState.ADMITTED, "ROOM-1")
+    )
+
+    assert _drain(waiting_queue)[0]["type"] == "state"
+    room_message = _drain(room_queue)[0]
+    assert room_message["type"] == "state"
+    assert room_message["call"]["state"] == "ADMITTED"
+
+
+def test_publish_state_sends_call_message_for_recall():
+    from AZFlow.application.ports.display_state_event_publisher import DisplayStateEvent
+
+    read_model = _FakeReadModel([5], [9], {7: _display_call()})
+    hub = WebSocketCallHub(_factory(read_model), loop=_ImmediateLoop())
+    queue: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue()
+    hub.register(room_key(9), queue)
+
+    hub.publish_state(
+        DisplayStateEvent("AAA001", 7, ServiceAccessState.CALLED, "ROOM-1")
+    )
+
+    message = _drain(queue)[0]
+    assert message["type"] == "call"
+    assert message["call"]["state"] == "CALLED"

@@ -25,6 +25,7 @@ from datetime import date
 from typing import Any, Callable, ContextManager, Dict, List, Optional, Set
 
 from AZFlow.application.ports.call_event_publisher import CallEvent
+from AZFlow.application.ports.display_state_event_publisher import DisplayStateEvent
 from AZFlow.application.ports.display_read_model import DisplayCall, DisplayReadModel
 
 _logger = logging.getLogger(__name__)
@@ -128,6 +129,28 @@ class WebSocketCallHub:
             for key in keys:
                 queues.extend(self._connections.get(key, set()))
             return queues
+
+    def publish_state(self, event: DisplayStateEvent) -> None:
+        """Deliver a display-relevant state change to covered monitors."""
+        if self._loop is None or not self._has_connections():
+            return
+        operational_day = date.today()
+        with self._read_model_factory() as read_model:
+            waiting_ids = read_model.waiting_room_monitor_ids_for_room(
+                event.room_reference
+            )
+            room_ids = read_model.room_monitor_ids_for_room(event.room_reference)
+            display_call = read_model.display_call_for_service_access(
+                event.service_access_id, operational_day
+            )
+        if display_call is None:
+            return
+        message_type = "call" if event.state.value == "CALLED" else "state"
+        message = {"type": message_type, "call": display_call_json(display_call)}
+        keys = [waiting_room_key(i) for i in waiting_ids]
+        keys += [room_key(i) for i in room_ids]
+        for queue in self._queues_for(keys):
+            self._loop.call_soon_threadsafe(queue.put_nowait, message)
 
     def publish(self, event: CallEvent) -> None:
         """Deliver one successful call to every covered connection.
