@@ -20,15 +20,11 @@ from AZFlow.application.errors import (
 )
 from AZFlow.application.queue_view import QueueView, QueueViewService
 
+from AZFlow.api.v1.schemas import AgendaModel
+
 
 router = APIRouter()
 
-
-class AgendaModel(BaseModel):
-    """Served Agenda shown in a queue view entry"""
-
-    id: int
-    name: str
 
 
 class QueueViewEntryModel(BaseModel):
