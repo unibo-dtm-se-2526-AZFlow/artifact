@@ -36,9 +36,7 @@ def _service(candidates):
         ticket_master=TicketMaster(id=1, prefix="AAA"),
         agendas=[_AGENDA],
     )
-    return OperatorQueueListService(
-        FakeQueueViewReader({queue.id: queue}, candidates)
-    )
+    return OperatorQueueListService(FakeQueueViewReader({queue.id: queue}, candidates))
 
 
 def test_list_contains_waiting_and_suspended_with_state():

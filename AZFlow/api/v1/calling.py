@@ -34,7 +34,6 @@ class CallRequest(BaseModel):
     room_reference: str
 
 
-
 class CallResponse(BaseModel):
     """Successful call response, with no identifying Patient data"""
 

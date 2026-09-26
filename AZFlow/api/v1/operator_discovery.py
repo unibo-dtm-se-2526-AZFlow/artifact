@@ -23,7 +23,6 @@ class OperatorRoomModel(BaseModel):
     label: str
 
 
-
 class OperatorQueueModel(BaseModel):
     """Queue exposed to operator clients."""
 
@@ -40,9 +39,7 @@ def get_operator_discovery_read_model() -> OperatorDiscoveryReadModel:
 
 @router.get("/rooms", response_model=List[OperatorRoomModel])
 def list_rooms(
-    read_model: OperatorDiscoveryReadModel = Depends(
-        get_operator_discovery_read_model
-    ),
+    read_model: OperatorDiscoveryReadModel = Depends(get_operator_discovery_read_model),
 ) -> List[OperatorRoomModel]:
     """List Rooms available to operator clients."""
     return [
@@ -57,9 +54,7 @@ def list_rooms(
 
 @router.get("/queues", response_model=List[OperatorQueueModel])
 def list_queues(
-    read_model: OperatorDiscoveryReadModel = Depends(
-        get_operator_discovery_read_model
-    ),
+    read_model: OperatorDiscoveryReadModel = Depends(get_operator_discovery_read_model),
 ) -> List[OperatorQueueModel]:
     """List Queues available to operator clients."""
     return [
@@ -68,8 +63,7 @@ def list_queues(
             status=queue.status.value,
             policy=queue.policy.value,
             agendas=[
-                AgendaModel(id=agenda.id, name=agenda.name)
-                for agenda in queue.agendas
+                AgendaModel(id=agenda.id, name=agenda.name) for agenda in queue.agendas
             ],
         )
         for queue in read_model.list_queues()

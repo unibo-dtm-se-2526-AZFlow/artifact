@@ -26,7 +26,6 @@ from AZFlow.api.v1.schemas import AgendaModel
 router = APIRouter()
 
 
-
 class QueueViewEntryModel(BaseModel):
     """One queue view entry, with no identifying Patient data"""
 

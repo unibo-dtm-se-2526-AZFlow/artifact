@@ -125,7 +125,9 @@ def build_operator_discovery_read_model_provider(
 ) -> Callable[[], Iterator[PostgresOperatorDiscoveryReadModel]]:
     """Build the operator discovery dependency for each request."""
 
-    def provide_operator_discovery_read_model() -> Iterator[PostgresOperatorDiscoveryReadModel]:
+    def provide_operator_discovery_read_model() -> Iterator[
+        PostgresOperatorDiscoveryReadModel
+    ]:
         if not database_url:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
