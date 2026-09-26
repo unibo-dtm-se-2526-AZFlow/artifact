@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AZFlow · Operator</title><link rel="stylesheet" href="../shared/common.css"><link rel="stylesheet" href="style.css"></head>
+<body><main class="shell">
+<header class="topbar"><div><div class="brand">AZFlow Demo Client</div><h1>Operator workstation</h1></div><span class="badge">OPERATOR</span></header>
+<section class="card controls">
+<label>Room<select id="room"></select></label>
+<label>Queue<select id="queue"></select></label>
+<button id="refresh" class="secondary">Refresh list</button>
+<button id="next">Call next</button>
+</section>
+<p id="status" class="status"></p>
+<section class="card"><div class="section-title"><h2>Queue</h2><span id="policy" class="muted"></span></div>
+<div class="table-wrap"><table><thead><tr><th>Code</th><th>Agenda</th><th>State</th><th>Check-in</th><th>Appointment</th><th></th></tr></thead><tbody id="entries"></tbody></table></div>
+</section>
+<section id="called-card" class="card called hidden"><div><span class="muted">Current call</span><strong id="called-code">—</strong><span id="called-room"></span></div><button id="admit">Admit</button></section>
+</main><script type="module" src="app.js"></script></body></html>
