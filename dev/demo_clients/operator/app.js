@@ -30,7 +30,8 @@ async function loadDiscovery() {
 function actions(entry) {
   if (entry.state === "WAITING") return `<button data-action="call" data-id="${entry.service_access_id}">Call</button><button class="secondary" data-action="suspend" data-id="${entry.service_access_id}">Suspend</button>`;
   if (entry.state === "SUSPENDED") return `<button class="secondary" data-action="restore" data-id="${entry.service_access_id}">Restore</button>`;
-  if (entry.state === "CALLED") return `<button data-action="admission" data-id="${entry.service_access_id}">Admit</button>`;
+  if (entry.state === "CALLED") return `<button class="secondary" data-action="cancel-call" data-id="${entry.service_access_id}">Cancel</button><button data-action="admission" data-id="${entry.service_access_id}">Admit</button>`;
+  if (entry.state === "ADMITTED") return `<button data-action="recall" data-id="${entry.service_access_id}">Recall</button>`;
   return "";
 }
 
@@ -72,13 +73,29 @@ entries.addEventListener("click", async event => {
   try {
     if (button.dataset.action === "call") await call(`/queues/${queue.value}/service-accesses/${id}/call`);
     else {
+      if (button.dataset.action === "recall") {
+        const result = await api(`/service-accesses/${id}/recall`, {method:"POST"});
+        currentCall = result;
+        document.querySelector("#called-code").textContent = result.public_call_code;
+        document.querySelector("#called-room").textContent = result.room_reference;
+        calledCard.classList.remove("hidden");
+        await refresh();
+        return;
+      }
       await api(`/service-accesses/${id}/${button.dataset.action}`, {method:"POST"});
-      if (button.dataset.action === "admission" && currentCall?.service_access_id === Number(id)) {
+      if (["admission", "cancel-call"].includes(button.dataset.action) && currentCall?.service_access_id === Number(id)) {
         currentCall = null;
         calledCard.classList.add("hidden");
       }
       await refresh();
     }
+  } catch (error) { setStatus(error.message, true); }
+});
+document.querySelector("#cancel-call").addEventListener("click", async () => {
+  if (!currentCall) return;
+  try {
+    await api(`/service-accesses/${currentCall.service_access_id}/cancel-call`, {method:"POST"});
+    currentCall = null; calledCard.classList.add("hidden"); await refresh();
   } catch (error) { setStatus(error.message, true); }
 });
 document.querySelector("#admit").addEventListener("click", async () => {
