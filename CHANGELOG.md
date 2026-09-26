@@ -1,3 +1,36 @@
+## [1.1.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v1.0.1...v1.1.0) (2026-09-26)
+
+### Features
+
+* **check-in:** persist check-in timestamp ([a0a36dc](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/a0a36dcedc227d6fa132c46f41dfe8940b8e5bc9))
+* **demo:** add deterministic hospital scenario data ([ae1e024](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/ae1e024bb7ae09e832c1d8e321225365e08d275e))
+* **operator:** add operator queue list ([7dc4bb8](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/7dc4bb8347b93e7a6b5c1d1955a9c6c93eac30e6))
+* **operator:** add room and queue discovery ([dd219a3](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/dd219a31a431a18b88c00c3f0befe75f98b02c36))
+
+### Bug Fixes
+
+* **dev:** clean development profile on database reset ([dc7474c](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/dc7474c70220ff10e330b6515a903b6fa149c57b))
+* **packaging:** clean production distribution ([a6af337](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/a6af33710f9de63c82425690993c038528b9ecd2))
+
+### Documentation
+
+* **demo:** define AZFlow 1.1 demo scenarios ([d664de7](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/d664de7e6b56948bc69c0cbeb426190726f93eeb))
+* **packaging:** improve PyPI setup guide ([da2aa68](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/da2aa6873865802fcf28318c2a3f4dd6375cb053))
+
+### Tests
+
+* **operator:** cover operator queue list ([b176a02](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/b176a02aa1ecd912ac40048938e14ad4050464fc))
+* **operator:** cover room and queue discovery ([171ac6f](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/171ac6f58fa9b3a37c5742c2dc2d480cced0de52))
+
+### Style improvements
+
+* apply ruff formatting ([c44d3b5](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/c44d3b53b6f2ae318e4482c9544ee1624438d324))
+
+### Refactoring
+
+* **api:** share agenda response schema ([ad80f1a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/ad80f1a3c0d5bf02e498aa3ef4c721219cf46c3c))
+* **topology:** remove room workstation ([b174348](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/b1743486287d6cad58e8903631abd4c013b3acfd))
+
 ## [1.0.1](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v1.0.0...v1.0.1) (2026-09-25)
 
 ### Bug Fixes
