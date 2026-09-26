@@ -46,9 +46,7 @@ def test_list_rooms_returns_selector_data_in_display_order(connection):
 
 def test_list_queues_returns_all_queues_with_agendas(connection):
     source = seed_source(connection)
-    agenda_a = seed_external_agenda(
-        connection, source, "Cardiology", "AGENDA-A"
-    ).agenda
+    agenda_a = seed_external_agenda(connection, source, "Cardiology", "AGENDA-A").agenda
     agenda_b = seed_external_agenda(
         connection, source, "Diagnostics", "AGENDA-B"
     ).agenda

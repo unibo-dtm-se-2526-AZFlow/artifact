@@ -39,8 +39,8 @@ class FakeOperatorDiscoveryReadModel:
 
 @pytest.fixture
 def client():
-    app.dependency_overrides[get_operator_discovery_read_model] = (
-        lambda: FakeOperatorDiscoveryReadModel()
+    app.dependency_overrides[get_operator_discovery_read_model] = lambda: (
+        FakeOperatorDiscoveryReadModel()
     )
     test_client = TestClient(app)
     yield test_client

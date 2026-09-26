@@ -29,7 +29,6 @@ from AZFlow.api.v1.schemas import AgendaModel
 router = APIRouter()
 
 
-
 class StateChangeResponse(BaseModel):
     """Successful state-change response, with no identifying Patient data
 

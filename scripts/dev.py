@@ -27,7 +27,8 @@ REQUIRED_ENV_VARS = (
     "POSTGRES_USER",
     "POSTGRES_PASSWORD",
     "POSTGRES_DB",
-    "AZFLOW_DB_HOST_PORT",
+    "POSTGRES_HOST",
+    "POSTGRES_PORT",
 )
 
 
@@ -130,14 +131,20 @@ def database_url(name: str | None = None) -> str:
     user = quote(config["POSTGRES_USER"], safe="")
     password = quote(config["POSTGRES_PASSWORD"], safe="")
     database = quote(name or config["POSTGRES_DB"], safe="")
-    port = config["AZFLOW_DB_HOST_PORT"]
-    return f"postgresql://{user}:{password}@localhost:{port}/{database}"
+    host = config["POSTGRES_HOST"]
+    port = config["POSTGRES_PORT"]
+    return f"postgresql://{user}:{password}@{host}:{port}/{database}"
 
 
 def migration_environment(name: str | None = None) -> dict[str, str]:
     """Build an environment for Alembic against a local database."""
+    config = compose_environment()
     environment = os.environ.copy()
-    environment["AZFLOW_DATABASE_URL"] = database_url(name)
+    environment["POSTGRES_HOST"] = config["POSTGRES_HOST"]
+    environment["POSTGRES_PORT"] = config["POSTGRES_PORT"]
+    environment["POSTGRES_USER"] = config["POSTGRES_USER"]
+    environment["POSTGRES_PASSWORD"] = config["POSTGRES_PASSWORD"]
+    environment["POSTGRES_DB"] = name or config["POSTGRES_DB"]
     return environment
 
 
@@ -154,9 +161,7 @@ def upgrade_database(name: str | None = None) -> None:
 
 def seed_database() -> None:
     """Load development/demo data into the local development database."""
-    seed_path = (
-        REPO_ROOT / "AZFlow" / "infrastructure" / "persistence" / "seed_data.sql"
-    )
+    seed_path = REPO_ROOT / "dev" / "seed_data.sql"
     print("Loading development seed data...")
     with psycopg.connect(database_url()) as connection:
         with connection.cursor() as cursor:
@@ -167,7 +172,8 @@ def seed_database() -> None:
 def run_azflow() -> None:
     """Run AZFlow locally with Uvicorn auto-reload."""
     config = compose_environment()
-    os.environ["AZFLOW_DATABASE_URL"] = database_url()
+    for name, value in config.items():
+        os.environ[name] = value
 
     print(f"Starting AZFlow on http://localhost:{config['AZFLOW_API_PORT']}")
     print(f"Swagger UI available at http://localhost:{config['AZFLOW_API_PORT']}/docs")

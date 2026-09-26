@@ -10,7 +10,6 @@ import uvicorn
 
 from dev import (
     compose_environment,
-    database_url,
     start_postgres,
     upgrade_database,
     wait_for_postgres,
@@ -31,7 +30,8 @@ def main() -> None:
     upgrade_database()
 
     config = compose_environment()
-    os.environ["AZFLOW_DATABASE_URL"] = database_url()
+    for name, value in config.items():
+        os.environ[name] = value
 
     print(
         f"Starting AZFlow in debug mode on http://localhost:{config['AZFLOW_API_PORT']}"

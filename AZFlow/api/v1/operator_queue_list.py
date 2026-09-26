@@ -22,7 +22,6 @@ from AZFlow.api.v1.schemas import AgendaModel
 router = APIRouter()
 
 
-
 class OperatorQueueListEntryModel(BaseModel):
     service_access_id: int
     public_call_code: str

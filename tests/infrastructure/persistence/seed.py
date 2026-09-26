@@ -129,7 +129,6 @@ def seed_room(
     return room_id
 
 
-
 def seed_room_monitor(conn: "object", room_id: int) -> int:
     with conn.cursor() as cursor:  # type: ignore[attr-defined]
         cursor.execute(

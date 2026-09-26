@@ -391,7 +391,9 @@ class PostgresCheckInRepository:
         if row is None:
             return None
 
-        daily_presence_id, public_call_code, checked_in_at, ticket_master_id, prefix = row
+        daily_presence_id, public_call_code, checked_in_at, ticket_master_id, prefix = (
+            row
+        )
         return DailyPresence(
             id=daily_presence_id,
             patient_identifier=patient_identifier,
