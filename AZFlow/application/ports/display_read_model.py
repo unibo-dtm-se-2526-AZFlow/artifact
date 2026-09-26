@@ -76,6 +76,10 @@ class DisplayReadModel(Protocol):
         """
         ...
 
+    def waiting_room_monitor_label(self, waiting_room_monitor_id: int) -> Optional[str]:
+        """Return the configured WaitingRoomMonitor label, or None."""
+        ...
+
     def waiting_room_monitor_exists(self, waiting_room_monitor_id: int) -> bool:
         """Return whether a WaitingRoomMonitor with this id is configured.
 

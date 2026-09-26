@@ -63,6 +63,10 @@ async def waiting_room_monitor_socket(
         )
         return
 
+    label = await asyncio.to_thread(
+        support.waiting_room_monitor_label, waiting_room_monitor_id
+    )
+
     async def read_snapshot() -> List[Dict[str, Any]]:
         return await asyncio.to_thread(
             support.recent_calls_snapshot, waiting_room_monitor_id
@@ -73,6 +77,7 @@ async def waiting_room_monitor_socket(
         support.hub,
         waiting_room_key(waiting_room_monitor_id),
         read_snapshot,
+        {"label": label},
     )
 
 
@@ -103,6 +108,7 @@ async def _subscribe(
     hub: WebSocketCallHub,
     key: MonitorKey,
     read_snapshot: SnapshotReader,
+    snapshot_metadata: Dict[str, Any] | None = None,
 ) -> None:
     """Register, send the snapshot, then stream live calls, cleaning up on exit.
 
@@ -114,7 +120,10 @@ async def _subscribe(
     hub.register(key, queue)
     try:
         snapshot = await read_snapshot()
-        await websocket.send_json({"type": "snapshot", "calls": snapshot})
+        message = {"type": "snapshot", "calls": snapshot}
+        if snapshot_metadata:
+            message.update(snapshot_metadata)
+        await websocket.send_json(message)
         while True:
             message = await queue.get()
             await websocket.send_json(message)

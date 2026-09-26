@@ -230,7 +230,11 @@ def test_existing_monitor_with_empty_snapshot_is_accepted(wired_client):
     with wired_client.websocket_connect(
         f"/api/v1/ws/waiting-room-monitors/{seeded.wrm_id}"
     ) as ws:
-        assert ws.receive_json() == {"type": "snapshot", "calls": []}
+        assert ws.receive_json() == {
+            "type": "snapshot",
+            "calls": [],
+            "label": "WRM Radiotherapy",
+        }
 
     with wired_client.websocket_connect(
         f"/api/v1/ws/room-monitors/{seeded.room_monitor_id}"
