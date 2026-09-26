@@ -56,9 +56,15 @@ Start AZFlow locally:
 poetry run poe dev
 ~~~
 
-The development launcher starts PostgreSQL and Adminer, applies all pending
-Alembic migrations, and then starts AZFlow. It does not load demo data during
-a normal start.
+The development launcher starts PostgreSQL, Adminer and the demo web gateway,
+applies all pending Alembic migrations, and then starts AZFlow. It does not
+load demo data during a normal start.
+
+After a demo reset, the browser clients are available through the development
+gateway at `http://localhost/demo/`. The demo includes an operator station, a
+check-in Totem, Room displays and waiting-room displays. AZFlow and Swagger
+remain directly available at `http://localhost:8000` and
+`http://localhost:8000/docs`.
 
 To recreate the local development database from scratch, apply the migrations,
 and load the demo data:

@@ -88,8 +88,9 @@ http://localhost:8000/docs
 The PyPI package contains the AZFlow application and the database migrations
 required to run it.
 
-Development tools, tests, Docker Compose configuration and demo seed data are
-kept in the source repository and are not included in the production package.
+Development tools, tests, Docker Compose configuration, demo browser clients
+and demo seed data are kept in the source repository and are not included in
+the production package.
 
 ## Project
 
