@@ -30,7 +30,15 @@ async function loadDiscovery() {
 function actions(entry) {
   if (entry.state === "WAITING") return `<button data-action="call" data-id="${entry.service_access_id}">Call</button><button class="secondary" data-action="suspend" data-id="${entry.service_access_id}">Suspend</button>`;
   if (entry.state === "SUSPENDED") return `<button class="secondary" data-action="restore" data-id="${entry.service_access_id}">Restore</button>`;
+  if (entry.state === "CALLED") return `<button data-action="admission" data-id="${entry.service_access_id}">Admit</button>`;
   return "";
+}
+
+function appointment(entry, queuePolicy) {
+  if (queuePolicy !== "BY_APPOINTMENT" || !entry.scheduled_at) return "—";
+  const scheduled = new Date(entry.scheduled_at);
+  const timing = scheduled < new Date() && entry.state === "WAITING" ? "late" : "on-time";
+  return `<span class="appointment ${timing}"><span class="dot"></span>${formatTime(entry.scheduled_at)}</span>`;
 }
 
 async function refresh() {
@@ -38,8 +46,8 @@ async function refresh() {
   try {
     const data = await api(`/queues/${queue.value}/operator-list`);
     policy.textContent = data.policy;
-    entries.innerHTML = data.entries.map(e => `<tr><td><strong>${e.public_call_code}</strong></td><td>${e.agenda.name}</td><td><span class="badge">${e.state}</span></td><td>${formatTime(e.checked_in_at)}</td><td>${formatTime(e.scheduled_at)}</td><td><div class="row-actions">${actions(e)}</div></td></tr>`).join("");
-    if (!data.entries.length) entries.innerHTML = '<tr><td colspan="6" class="muted">No waiting or suspended patients.</td></tr>';
+    entries.innerHTML = data.entries.map(e => `<tr class="state-${e.state.toLowerCase()}"><td><strong>${e.public_call_code}</strong></td><td>${e.agenda.name}</td><td><span class="badge">${e.state}</span></td><td>${formatTime(e.checked_in_at)}</td><td>${appointment(e, data.policy)}</td><td><div class="row-actions">${actions(e)}</div></td></tr>`).join("");
+    if (!data.entries.length) entries.innerHTML = '<tr><td colspan="6" class="muted">No patients for this queue today.</td></tr>';
     setStatus(`Queue updated at ${new Date().toLocaleTimeString()}`);
   } catch (error) { setStatus(error.message, true); }
 }
@@ -65,6 +73,10 @@ entries.addEventListener("click", async event => {
     if (button.dataset.action === "call") await call(`/queues/${queue.value}/service-accesses/${id}/call`);
     else {
       await api(`/service-accesses/${id}/${button.dataset.action}`, {method:"POST"});
+      if (button.dataset.action === "admission" && currentCall?.service_access_id === Number(id)) {
+        currentCall = null;
+        calledCard.classList.add("hidden");
+      }
       await refresh();
     }
   } catch (error) { setStatus(error.message, true); }
@@ -79,3 +91,6 @@ document.querySelector("#admit").addEventListener("click", async () => {
 queue.addEventListener("change", refresh);
 
 try { await loadDiscovery(); await refresh(); } catch (error) { setStatus(error.message, true); }
+
+// Keep the operator queue aligned with changes made by other clients.
+setInterval(refresh, 3000);
