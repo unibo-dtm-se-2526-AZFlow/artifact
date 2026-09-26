@@ -16,19 +16,17 @@ from AZFlow.application.errors import (
 from AZFlow.application.operator_queue_list import (
     OperatorQueueListService,
 )
+from AZFlow.api.v1.schemas import AgendaModel
+
 
 router = APIRouter()
 
-
-class OperatorAgendaModel(BaseModel):
-    id: int
-    name: str
 
 
 class OperatorQueueListEntryModel(BaseModel):
     service_access_id: int
     public_call_code: str
-    agenda: OperatorAgendaModel
+    agenda: AgendaModel
     state: str
     checked_in_at: datetime
     scheduled_at: Optional[datetime] = None
@@ -81,7 +79,7 @@ def view_operator_queue_list(
             OperatorQueueListEntryModel(
                 service_access_id=entry.service_access_id,
                 public_call_code=entry.public_call_code,
-                agenda=OperatorAgendaModel(
+                agenda=AgendaModel(
                     id=entry.agenda.id,
                     name=entry.agenda.name,
                 ),

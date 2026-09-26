@@ -9,6 +9,8 @@ from AZFlow.application.ports.operator_discovery_read_model import (
     OperatorDiscoveryReadModel,
 )
 
+from AZFlow.api.v1.schemas import AgendaModel
+
 
 router = APIRouter()
 
@@ -21,12 +23,6 @@ class OperatorRoomModel(BaseModel):
     label: str
 
 
-class OperatorAgendaModel(BaseModel):
-    """Agenda served by an operator Queue."""
-
-    id: int
-    name: str
-
 
 class OperatorQueueModel(BaseModel):
     """Queue exposed to operator clients."""
@@ -34,7 +30,7 @@ class OperatorQueueModel(BaseModel):
     id: int
     status: str
     policy: str
-    agendas: List[OperatorAgendaModel]
+    agendas: List[AgendaModel]
 
 
 def get_operator_discovery_read_model() -> OperatorDiscoveryReadModel:
@@ -72,7 +68,7 @@ def list_queues(
             status=queue.status.value,
             policy=queue.policy.value,
             agendas=[
-                OperatorAgendaModel(id=agenda.id, name=agenda.name)
+                AgendaModel(id=agenda.id, name=agenda.name)
                 for agenda in queue.agendas
             ],
         )
