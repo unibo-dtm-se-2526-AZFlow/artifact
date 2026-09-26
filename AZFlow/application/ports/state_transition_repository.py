@@ -60,6 +60,14 @@ class StateTransitionRepository(Protocol):
         """
         ...
 
+    def try_cancel_call(self, service_access_id: int) -> Optional[ServiceAccess]:
+        """Try the CALLED to WAITING transition."""
+        ...
+
+    def try_recall(self, service_access_id: int) -> Optional[AdmissionOutcome]:
+        """Try the ADMITTED to CALLED transition, preserving the call-time Room."""
+        ...
+
     def find_state(self, service_access_id: int) -> Optional[ServiceAccessState]:
         """Return the current ServiceAccessState, or None when no ServiceAccess
         exists.

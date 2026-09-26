@@ -53,6 +53,33 @@ class PostgresStateTransitionRepository:
             ServiceAccessState.WAITING,
         )
 
+    def try_cancel_call(self, service_access_id: int) -> Optional[ServiceAccess]:
+        """Try the CALLED to WAITING transition."""
+        return self._try_transition(
+            service_access_id, ServiceAccessState.CALLED, ServiceAccessState.WAITING
+        )
+
+    def try_recall(self, service_access_id: int) -> Optional[AdmissionOutcome]:
+        """Try the ADMITTED to CALLED transition and return its Room."""
+        recalled = self._try_transition(
+            service_access_id, ServiceAccessState.ADMITTED, ServiceAccessState.CALLED
+        )
+        if recalled is None:
+            return None
+        try:
+            with self._conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT room_id FROM service_access WHERE id = %s",
+                    (service_access_id,),
+                )
+                room_id = cursor.fetchone()[0]
+                room_reference, room_label = self._read_room(cursor, room_id)
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+        return AdmissionOutcome(recalled, room_reference, room_label)
+
     def try_admit(self, service_access_id: int) -> Optional[AdmissionOutcome]:
         """Try the CALLED to ADMITTED transition of one ServiceAccess.
 

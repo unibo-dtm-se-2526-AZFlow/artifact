@@ -52,6 +52,8 @@ class FakeStateManagementService:
         self.suspend_calls: List[int] = []
         self.restore_calls: List[int] = []
         self.admission_calls: List[int] = []
+        self.cancel_call_calls: List[int] = []
+        self.recall_calls: List[int] = []
 
     def suspend(self, service_access_id: int) -> StateChangeResult:
         self.suspend_calls.append(service_access_id)
@@ -64,6 +66,22 @@ class FakeStateManagementService:
         if self._error is not None:
             raise self._error
         return _result(ServiceAccessState.WAITING)
+
+    def cancel_call(self, service_access_id: int) -> StateChangeResult:
+        self.cancel_call_calls.append(service_access_id)
+        if self._error is not None:
+            raise self._error
+        return _result(ServiceAccessState.WAITING)
+
+    def recall(self, service_access_id: int) -> StateChangeResult:
+        self.recall_calls.append(service_access_id)
+        if self._error is not None:
+            raise self._error
+        return _result(
+            ServiceAccessState.CALLED,
+            room_reference=_ROOM_REFERENCE,
+            room_label=_ROOM_LABEL,
+        )
 
     def confirm_admission(self, service_access_id: int) -> StateChangeResult:
         self.admission_calls.append(service_access_id)
@@ -380,3 +398,24 @@ def test_state_management_routes_are_version_prefixed():
     assert "/api/v1/service-accesses/{service_access_id}/suspend" in paths
     assert "/api/v1/service-accesses/{service_access_id}/restore" in paths
     assert "/api/v1/service-accesses/{service_access_id}/admission" in paths
+
+
+def test_cancel_call_success(client):
+    service = FakeStateManagementService()
+    _override(service)
+    response = client.post("/api/v1/service-accesses/12/cancel-call")
+    assert response.status_code == 200
+    assert response.json()["state"] == "WAITING"
+    assert service.cancel_call_calls == [12]
+
+
+def test_recall_success_returns_called_and_room(client):
+    service = FakeStateManagementService()
+    _override(service)
+    response = client.post("/api/v1/service-accesses/12/recall")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["state"] == "CALLED"
+    assert body["room_reference"] == _ROOM_REFERENCE
+    assert body["room_label"] == _ROOM_LABEL
+    assert service.recall_calls == [12]

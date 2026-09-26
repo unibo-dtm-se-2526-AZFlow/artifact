@@ -17,6 +17,8 @@ import pytest
 from AZFlow.application.errors import (
     ServiceAccessNotAdmittableError,
     ServiceAccessNotFoundError,
+    ServiceAccessNotCancellableError,
+    ServiceAccessNotRecallableError,
     ServiceAccessNotRestorableError,
     ServiceAccessNotSuspendableError,
 )
@@ -83,6 +85,8 @@ class FakeStateTransitionRepository:
         self.try_suspend_ids: List[int] = []
         self.try_restore_ids: List[int] = []
         self.try_admit_ids: List[int] = []
+        self.try_cancel_call_ids: List[int] = []
+        self.try_recall_ids: List[int] = []
         self.find_state_ids: List[int] = []
 
     def _try_transition(
@@ -113,6 +117,25 @@ class FakeStateTransitionRepository:
             ServiceAccessState.SUSPENDED,
             lambda access: access.restored(),
         )
+
+    def try_cancel_call(self, service_access_id: int) -> Optional[ServiceAccess]:
+        self.try_cancel_call_ids.append(service_access_id)
+        return self._try_transition(
+            service_access_id,
+            ServiceAccessState.CALLED,
+            lambda access: access.cancelled_call(),
+        )
+
+    def try_recall(self, service_access_id: int) -> Optional[AdmissionOutcome]:
+        self.try_recall_ids.append(service_access_id)
+        recalled = self._try_transition(
+            service_access_id,
+            ServiceAccessState.ADMITTED,
+            lambda access: access.recalled(),
+        )
+        if recalled is None:
+            return None
+        return AdmissionOutcome(recalled, _ROOM_REFERENCE, _ROOM_LABEL)
 
     def try_admit(self, service_access_id: int) -> Optional[AdmissionOutcome]:
         self.try_admit_ids.append(service_access_id)
@@ -432,3 +455,30 @@ def test_suspend_restore_admission_emit_no_notification():
     _publisher_probe(service)
     assert service.confirm_admission(42).state is ServiceAccessState.ADMITTED
     _publisher_probe(service)
+
+
+def test_cancel_call_transitions_called_to_waiting():
+    service, repository = _service([_service_access(50, ServiceAccessState.CALLED)])
+    result = service.cancel_call(50)
+    assert result.state is ServiceAccessState.WAITING
+    assert repository.try_cancel_call_ids == [50]
+
+
+def test_recall_transitions_admitted_to_called_with_room():
+    service, repository = _service([_service_access(51, ServiceAccessState.ADMITTED)])
+    result = service.recall(51)
+    assert result.state is ServiceAccessState.CALLED
+    assert result.room_reference == _ROOM_REFERENCE
+    assert repository.try_recall_ids == [51]
+
+
+def test_cancel_call_rejects_non_called_access():
+    service, _ = _service([_service_access(50, ServiceAccessState.WAITING)])
+    with pytest.raises(ServiceAccessNotCancellableError):
+        service.cancel_call(50)
+
+
+def test_recall_rejects_non_admitted_access():
+    service, _ = _service([_service_access(51, ServiceAccessState.CALLED)])
+    with pytest.raises(ServiceAccessNotRecallableError):
+        service.recall(51)
