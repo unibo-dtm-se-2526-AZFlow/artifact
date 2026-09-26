@@ -71,9 +71,17 @@ def compose(
 
 
 def start_postgres() -> None:
-    """Start PostgreSQL and local development tools via Docker Compose."""
+    """Start PostgreSQL, Adminer, and the demo gateway via Docker Compose."""
     print("Starting PostgreSQL and demo services via Docker Compose...")
     compose("--profile", "dev", "up", "-d", "postgres", "adminer", "demo-web")
+    print("Reloading demo gateway...")
+    compose("exec", "-T", "demo-web", "nginx", "-s", "reload")
+
+
+def stop_demo_gateway() -> None:
+    """Stop the demo gateway while leaving database services untouched."""
+    print("Stopping demo gateway...")
+    compose("stop", "demo-web")
 
 
 def wait_for_postgres() -> None:
@@ -195,12 +203,12 @@ def _confirm(prompt: str) -> bool:
 
 
 def maybe_stop_postgres() -> None:
-    """Ask whether to stop PostgreSQL; default is No."""
-    if _confirm("Stop PostgreSQL too? [y/N] "):
-        print("Stopping PostgreSQL...")
-        compose("stop", "postgres")
+    """Ask whether to stop PostgreSQL and Adminer; default is No."""
+    if _confirm("Stop PostgreSQL and Adminer too? [y/N] "):
+        print("Stopping PostgreSQL and Adminer...")
+        compose("stop", "adminer", "postgres")
     else:
-        print("Leaving PostgreSQL running.")
+        print("Leaving PostgreSQL and Adminer running.")
 
 
 def reset_database() -> None:
@@ -233,8 +241,11 @@ def main() -> None:
     start_postgres()
     wait_for_postgres()
     upgrade_database()
-    run_azflow()
-    maybe_stop_postgres()
+    try:
+        run_azflow()
+    finally:
+        stop_demo_gateway()
+        maybe_stop_postgres()
 
 
 if __name__ == "__main__":
