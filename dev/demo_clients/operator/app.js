@@ -38,7 +38,10 @@ function actions(entry) {
 function appointment(entry, queuePolicy) {
   if (queuePolicy !== "BY_APPOINTMENT" || !entry.scheduled_at) return "—";
   const scheduled = new Date(entry.scheduled_at);
-  const timing = scheduled < new Date() && entry.state === "WAITING" ? "late" : "on-time";
+  const reference = ["CALLED", "ADMITTED"].includes(entry.state) && entry.first_called_at
+    ? new Date(entry.first_called_at)
+    : new Date();
+  const timing = scheduled < reference ? "late" : "on-time";
   return `<span class="appointment ${timing}"><span class="dot"></span>${formatTime(entry.scheduled_at)}</span>`;
 }
 
