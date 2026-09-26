@@ -15,6 +15,7 @@ from fastapi import FastAPI, HTTPException, status
 from AZFlow.api.v1.calling import get_calling_service
 from AZFlow.api.v1.check_in import get_check_in_service
 from AZFlow.api.v1.displays import get_display_read_model
+from AZFlow.api.v1.operator_discovery import get_operator_discovery_read_model
 from AZFlow.api.v1.operator_queue_list import get_operator_queue_list_service
 from AZFlow.api.v1.queue_view import get_queue_view_service
 from AZFlow.api.v1.state_management import get_state_management_service
@@ -43,6 +44,9 @@ from AZFlow.infrastructure.persistence.postgres_check_in_repository import (
 )
 from AZFlow.infrastructure.persistence.postgres_display_read_model import (
     PostgresDisplayReadModel,
+)
+from AZFlow.infrastructure.persistence.postgres_operator_discovery_read_model import (
+    PostgresOperatorDiscoveryReadModel,
 )
 from AZFlow.infrastructure.persistence.postgres_queue_view_reader import (
     PostgresQueueViewReader,
@@ -114,6 +118,34 @@ def build_queue_view_service_provider(
             yield QueueViewService(reader)
 
     return provide_queue_view_service
+
+
+def build_operator_discovery_read_model_provider(
+    database_url: object,
+) -> Callable[[], Iterator[PostgresOperatorDiscoveryReadModel]]:
+    """Build the operator discovery dependency for each request."""
+
+    def provide_operator_discovery_read_model() -> Iterator[PostgresOperatorDiscoveryReadModel]:
+        if not database_url:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="operator discovery read model is not configured",
+            )
+
+        import psycopg
+
+        with psycopg.connect(str(database_url)) as connection:
+            yield PostgresOperatorDiscoveryReadModel(connection)
+
+    return provide_operator_discovery_read_model
+
+
+def wire_operator_discovery(application: FastAPI) -> None:
+    """Connect operator discovery to the FastAPI application."""
+    settings = load_settings()
+    application.dependency_overrides[get_operator_discovery_read_model] = (
+        build_operator_discovery_read_model_provider(settings.database_url)
+    )
 
 
 def build_operator_queue_list_service_provider(

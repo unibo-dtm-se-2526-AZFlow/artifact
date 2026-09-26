@@ -6,6 +6,7 @@ from AZFlow.api.v1 import (
     calling,
     check_in,
     health,
+    operator_discovery,
     operator_queue_list,
     queue_view,
     state_management,
@@ -18,6 +19,7 @@ router.include_router(health.router)
 router.include_router(check_in.router)
 router.include_router(queue_view.router)
 router.include_router(operator_queue_list.router)
+router.include_router(operator_discovery.router)
 router.include_router(calling.router)
 router.include_router(state_management.router)
 router.include_router(ws_displays.router)
