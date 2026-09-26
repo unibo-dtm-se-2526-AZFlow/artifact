@@ -23,7 +23,7 @@ def client():
     app.dependency_overrides.clear()
 
 
-def test_operator_list_exposes_waiting_and_suspended_state(client):
+def test_operator_list_exposes_daily_service_access_states(client):
     queue = Queue(
         id=1,
         status=QueueStatus.ACTIVE,
@@ -50,6 +50,24 @@ def test_operator_list_exposes_waiting_and_suspended_state(client):
             checked_in_at=datetime(2024, 5, 20, 8, 0),
             scheduled_at=datetime(2024, 5, 20, 10),
         ),
+        CandidateServiceAccess(
+            service_access_id=3,
+            daily_presence_id=3,
+            agenda=_AGENDA,
+            state=ServiceAccessState.CALLED,
+            public_call_code="AAA003",
+            checked_in_at=datetime(2024, 5, 20, 8, 0),
+            scheduled_at=datetime(2024, 5, 20, 11),
+        ),
+        CandidateServiceAccess(
+            service_access_id=4,
+            daily_presence_id=4,
+            agenda=_AGENDA,
+            state=ServiceAccessState.ADMITTED,
+            public_call_code="AAA004",
+            checked_in_at=datetime(2024, 5, 20, 8, 0),
+            scheduled_at=datetime(2024, 5, 20, 12),
+        ),
     ]
     service = OperatorQueueListService(
         FakeQueueViewReader({queue.id: queue}, candidates)
@@ -62,7 +80,7 @@ def test_operator_list_exposes_waiting_and_suspended_state(client):
     assert [
         (entry["service_access_id"], entry["state"])
         for entry in response.json()["entries"]
-    ] == [(1, "WAITING"), (2, "SUSPENDED")]
+    ] == [(3, "CALLED"), (1, "WAITING"), (2, "SUSPENDED"), (4, "ADMITTED")]
     assert response.json()["entries"][0]["checked_in_at"] == "2024-05-20T08:00:00"
     assert "patient" not in response.text.lower()
 

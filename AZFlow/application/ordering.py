@@ -28,13 +28,37 @@ def operator_list_ordered(
     served_agenda_ids: List[int],
     policy: QueuePolicy,
 ) -> List[CandidateServiceAccess]:
-    """Return WAITING and SUSPENDED entries for the operator LIST."""
-    return _filtered_ordered(
-        candidates,
-        served_agenda_ids,
-        policy,
-        {ServiceAccessState.WAITING, ServiceAccessState.SUSPENDED},
+    """Return the operator LIST with active calls first and admitted entries last."""
+    served = set(served_agenda_ids)
+    seen: Dict[int, CandidateServiceAccess] = {}
+    visible_states = {
+        ServiceAccessState.WAITING,
+        ServiceAccessState.SUSPENDED,
+        ServiceAccessState.CALLED,
+        ServiceAccessState.ADMITTED,
+    }
+    for candidate in candidates:
+        if candidate.agenda.id not in served or candidate.state not in visible_states:
+            continue
+        if candidate.service_access_id not in seen:
+            seen[candidate.service_access_id] = candidate
+
+    visible = list(seen.values())
+    called = _order(
+        [c for c in visible if c.state is ServiceAccessState.CALLED], policy
     )
+    queued = _order(
+        [
+            c
+            for c in visible
+            if c.state in {ServiceAccessState.WAITING, ServiceAccessState.SUSPENDED}
+        ],
+        policy,
+    )
+    admitted = _order(
+        [c for c in visible if c.state is ServiceAccessState.ADMITTED], policy
+    )
+    return called + queued + admitted
 
 
 def _filtered_ordered(
