@@ -83,6 +83,7 @@ class PostgresQueueViewReader:
                     a.name,
                     sa.state,
                     dp.public_call_code,
+                    dp.checked_in_at,
                     appt.scheduled_at
                 FROM service_access sa
                 JOIN daily_presence dp ON dp.id = sa.daily_presence_id
@@ -101,6 +102,7 @@ class PostgresQueueViewReader:
                 agenda=Agenda(id=agenda_id, name=agenda_name),
                 state=ServiceAccessState(state),
                 public_call_code=public_call_code,
+                checked_in_at=checked_in_at,
                 scheduled_at=scheduled_at,
             )
             for (
@@ -110,6 +112,7 @@ class PostgresQueueViewReader:
                 agenda_name,
                 state,
                 public_call_code,
+                checked_in_at,
                 scheduled_at,
             ) in rows
         ]
