@@ -26,6 +26,7 @@ def test_candidate_service_access_carries_its_fields():
         agenda=agenda,
         state=ServiceAccessState.WAITING,
         public_call_code="AAA001",
+        checked_in_at=datetime(2024, 1, 1, 8, 0),
         scheduled_at=datetime(2024, 1, 1, 9, 0),
     )
 
@@ -44,6 +45,7 @@ def test_scheduled_at_is_optional_and_defaults_to_none():
         agenda=_agenda(),
         state=ServiceAccessState.WAITING,
         public_call_code="AAA002",
+        checked_in_at=datetime(2024, 1, 1, 8, 0),
     )
 
     assert candidate.scheduled_at is None
@@ -56,6 +58,7 @@ def test_candidate_service_access_is_immutable():
         agenda=_agenda(),
         state=ServiceAccessState.WAITING,
         public_call_code="AAA001",
+        checked_in_at=datetime(2024, 1, 1, 8, 0),
     )
 
     with pytest.raises(dataclasses.FrozenInstanceError):
@@ -77,6 +80,7 @@ def test_any_object_matching_the_protocol_is_a_queue_view_reader():
         agenda=agenda,
         state=ServiceAccessState.WAITING,
         public_call_code="AAA001",
+        checked_in_at=datetime(2024, 1, 1, 8, 0),
     )
 
     class InMemoryReader:

@@ -83,6 +83,7 @@ def _candidate(
     public_call_code: str = "AAA001",
     scheduled_at: Optional[datetime] = None,
     state: ServiceAccessState = ServiceAccessState.WAITING,
+    checked_in_at: datetime = datetime(2024, 5, 20, 8, 0),
 ) -> CandidateServiceAccess:
     return CandidateServiceAccess(
         service_access_id=service_access_id,
@@ -90,6 +91,7 @@ def _candidate(
         agenda=agenda,
         state=state,
         public_call_code=public_call_code,
+        checked_in_at=checked_in_at,
         scheduled_at=scheduled_at,
     )
 
