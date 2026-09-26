@@ -29,6 +29,7 @@ class OperatorQueueListEntryModel(BaseModel):
     state: str
     checked_in_at: datetime
     scheduled_at: Optional[datetime] = None
+    last_event_at: Optional[datetime] = None
 
 
 class OperatorQueueListResponse(BaseModel):
@@ -85,6 +86,7 @@ def view_operator_queue_list(
                 state=entry.state.value,
                 checked_in_at=entry.checked_in_at,
                 scheduled_at=entry.scheduled_at,
+                last_event_at=entry.last_event_at,
             )
             for entry in view.entries
         ],
