@@ -1,11 +1,11 @@
-# AZFlow 1.1 demo scenarios
+# AZFlow 1.2 demo scenarios
 
 This document defines the deterministic development demo and the behaviours
-that the future debug UI must expose. It follows the current domain model.
+exposed by the browser demo clients. It follows the current domain model.
 
 ## Operator UI assumptions
 
-There is no login in 1.1. Authentication and per-user Queue visibility are future work.
+There is no login in 1.2. Authentication and per-user Queue visibility are future work.
 
 The operator selects:
 - a Room, remembered only by the browser for convenience;
@@ -17,15 +17,16 @@ Room and Queue selections are client state and are not persisted by AZFlow.
 The UI uses Queue terminology. Agendas are healthcare schedules imported from
 external systems; a Queue is the operational grouping used for calling.
 
-## Core gap found while defining the scenarios
+## Demo clients
 
-The current Queue View exposes only WAITING ServiceAccesses. The intended LIST
-also needs SUSPENDED entries so the operator can restore or call them.
-The 1.1 operator read model therefore needs to expose at least WAITING and
-SUSPENDED states without changing the existing Queue ordering semantics.
+The development gateway exposes four browser clients: operator station, check-in
+Totem, Room display and waiting-room display. They are development-only clients
+and are not included in the Python package.
 
-CALL on a SUSPENDED entry is a UI convenience: restore it first, then call it.
-No SUSPENDED -> CALLED domain transition is added.
+The operator LIST includes WAITING, SUSPENDED, CALLED and ADMITTED accesses.
+Actions depend on the current state: WAITING can be called or suspended,
+SUSPENDED can be called directly or restored, CALLED can be cancelled or
+admitted, and ADMITTED can be recalled.
 
 ## Demo snapshot
 
@@ -131,9 +132,9 @@ Shows: restoration does not create a new access or artificial priority.
 ### S13 - CALL a suspended Patient with one UI click
 Initial: a SUSPENDED entry is visible.
 Action: press CALL on that entry.
-Expected: UI performs RESTORE then call-specific; final state is CALLED.
-If restore succeeds and call fails, the entry remains WAITING and the UI reports the failure.
-Shows: UI orchestration without adding a SUSPENDED -> CALLED domain transition.
+Expected: the ServiceAccess moves atomically from SUSPENDED to CALLED in the
+selected Room.
+Shows: direct calling of a suspended access without an intermediate WAITING state.
 
 ### S14 - Admission
 Initial: a ServiceAccess is CALLED into Room 1.
@@ -141,7 +142,26 @@ Action: confirm admission.
 Expected: state becomes ADMITTED and the persisted call-time Room is returned.
 Shows: admission reuses the Room chosen at call time.
 
-### S15 - Switch Queue with already checked-in Patients
+### S15 - Cancel a call
+Initial: a ServiceAccess is CALLED into a Room.
+Action: press CANCEL.
+Expected: state returns to WAITING and the active Room display is cleared.
+Shows: a call can be cancelled without creating a new ServiceAccess.
+
+### S16 - Recall an admitted Patient
+Initial: a ServiceAccess is ADMITTED and retains its persisted call-time Room.
+Action: press RECALL.
+Expected: state returns to CALLED in the same Room and relevant displays show the call again.
+Shows: admission and recall form a reversible operational loop.
+
+### S17 - Appointment timing after call
+Initial: a BY_APPOINTMENT entry has a scheduled appointment time.
+Action: call it, then admit or recall it later.
+Expected: the timing indicator is based on the first call time and does not change
+as wall-clock time advances or when the Patient is recalled.
+Shows: persisted first-call history keeps the operator timing indicator stable.
+
+### S18 - Switch Queue with already checked-in Patients
 Initial: Room 2 is selected. Queue 2 and Queue 4 contain different accesses
 created by Patients who are already inside HOSPITAL.
 Action: view Queue 2, then switch the selector to Queue 4.
@@ -150,46 +170,46 @@ Shows: Queue selection changes the operator's working view, not domain state.
 
 ## Display and topology scenarios
 
-### S16 - Ground Floor scope
+### S19 - Ground Floor scope
 Action: call a Patient into Room 1.
 Expected: Waiting Room 1, Waiting Room 2 and BAR receive the call;
 Waiting Room 11 does not.
 Shows: both Ground Floor monitors share the Ground Floor scope.
 
-### S17 - Second Ground Floor Room
+### S20 - Second Ground Floor Room
 Action: call a Patient into Room 2.
 Expected: Waiting Room 1, Waiting Room 2 and BAR receive the call;
 Waiting Room 11 does not.
 Shows: scope follows topology rather than a fixed Room binding.
 
-### S18 - First Floor isolation
+### S21 - First Floor isolation
 Action: call a Patient into Room 11.
 Expected: Waiting Room 11 and BAR receive the call; Ground Floor monitors do not.
 Shows: sibling topology branches remain isolated.
 
-### S19 - BAR catch-all
+### S22 - BAR catch-all
 Action: make calls into Room 1, Room 2 and Room 11.
 Expected: BAR receives all three.
 Shows: a monitor scoped to HOSPITAL covers every descendant Room.
 
-### S20 - Room display isolation
+### S23 - Room display isolation
 Action: make separate calls into Room 1, Room 2 and Room 11.
 Expected: each RoomMonitor shows only the latest call for its own Room.
 Shows: over-door display binding.
 
-### S21 - Live display update
+### S24 - Live display update
 Initial: relevant display WebSockets are connected.
 Action: make a call.
 Expected: covered waiting-room and Room displays receive a live call message.
 Shows: real-time publication.
 
-### S22 - Reconnect display
+### S25 - Reconnect display
 Initial: calls already happened while the display was closed.
 Action: reconnect the display.
 Expected: its initial snapshot is rebuilt from persisted call history.
 Shows: WebSocket delivery is not the source of truth.
 
-### S23 - Privacy on operator/display output
+### S26 - Privacy on operator/display output
 Action: inspect Queue and display responses during the scenarios.
 Expected: public call code and operational data are exposed, not Patient identifiers.
 Shows: privacy boundary of operational/read interfaces.
@@ -241,11 +261,6 @@ Expected: 409 room is not configured.
 Action: connect using an unknown monitor id.
 Expected: WebSocket closes with the unknown-monitor application code.
 
-### E12 - SUSPENDED CALL partial failure
-Initial: SUSPENDED access.
-Action: UI restores it, but call-specific fails before completion.
-Expected: access remains WAITING and UI refreshes LIST and reports the call failure.
-Shows: expected consequence of the two-request UI convenience.
 
 ## Deterministic demo Patients
 
@@ -261,9 +276,8 @@ The 30 SEED Patients are already inside at reset time. They provide historical
 calls, current calls and the ten initial WAITING entries. They are context data,
 not identifiers intended to be typed at the Totem.
 
-## Future work explicitly outside 1.1
+## Future work explicitly outside 1.2
 
 - Login and authentication.
 - Per-user Queue authorization/filtering.
 - Persisting operator Room or Queue selection in AZFlow.
-- A direct SUSPENDED -> CALLED domain transition.
