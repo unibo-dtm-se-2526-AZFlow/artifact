@@ -107,6 +107,7 @@ def _service_access(candidate: CandidateServiceAccess) -> ServiceAccess:
         operational_day=_DAY,
         public_call_code=candidate.public_call_code,
         ticket_master=_TICKET_MASTER,
+        checked_in_at=datetime(2024, 5, 20, 8, 0),
     )
     appointment: Optional[Appointment] = None
     return ServiceAccess(

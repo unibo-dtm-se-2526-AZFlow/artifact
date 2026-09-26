@@ -89,6 +89,7 @@ def test_daily_presence_is_immutable():
         operational_day=date(2024, 1, 1),
         public_call_code="AAA001",
         ticket_master=TicketMaster(id=1, prefix="AAA"),
+        checked_in_at=datetime(2024, 5, 20, 8, 0),
     )
 
     with pytest.raises(dataclasses.FrozenInstanceError):
@@ -102,6 +103,7 @@ def test_service_access_starts_waiting():
         operational_day=date(2024, 1, 1),
         public_call_code="AAA001",
         ticket_master=TicketMaster(id=1, prefix="AAA"),
+        checked_in_at=datetime(2024, 5, 20, 8, 0),
     )
     agenda = Agenda(id=1, name="Cardiology")
 

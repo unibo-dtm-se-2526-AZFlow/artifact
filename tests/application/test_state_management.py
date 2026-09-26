@@ -9,7 +9,7 @@ precondition fails.
 
 import inspect
 from dataclasses import fields
-from datetime import date
+from datetime import date, datetime
 from typing import Dict, List, Optional
 
 import pytest
@@ -55,6 +55,7 @@ def _service_access(
         operational_day=_DAY,
         public_call_code=public_call_code,
         ticket_master=_TICKET_MASTER,
+        checked_in_at=datetime(2024, 5, 20, 8, 0),
     )
     return ServiceAccess(
         id=service_access_id,
