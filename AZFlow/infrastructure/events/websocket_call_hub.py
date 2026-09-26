@@ -58,17 +58,21 @@ def room_key(monitor_id: int) -> MonitorKey:
     return MonitorKey(kind="room", monitor_id=monitor_id)
 
 
-def display_call_json(call: DisplayCall) -> Dict[str, Any]:
-    """Serialise a DisplayCall to its non-identifying JSON shape."""
-    return {
+def display_call_json(
+    call: DisplayCall, *, include_agenda: bool = True
+) -> Dict[str, Any]:
+    """Serialise a DisplayCall, optionally omitting Agenda data."""
+    payload: Dict[str, Any] = {
         "public_call_code": call.public_call_code,
-        "agenda": {"id": call.agenda.id, "name": call.agenda.name},
         "state": call.state.value,
         "room_reference": call.room_reference,
         "room_label": call.room_label,
         "occurred_at": call.occurred_at.isoformat(),
         "scheduled_at": call.scheduled_at.isoformat() if call.scheduled_at else None,
     }
+    if include_agenda:
+        payload["agenda"] = {"id": call.agenda.id, "name": call.agenda.name}
+    return payload
 
 
 class WebSocketCallHub:
@@ -147,9 +151,13 @@ class WebSocketCallHub:
             return
         message_type = "call" if event.state.value == "CALLED" else "state"
         message = {"type": message_type, "call": display_call_json(display_call)}
-        keys = [waiting_room_key(i) for i in waiting_ids]
-        keys += [room_key(i) for i in room_ids]
-        for queue in self._queues_for(keys):
+        waiting_message = {
+            "type": message_type,
+            "call": display_call_json(display_call, include_agenda=False),
+        }
+        for queue in self._queues_for([waiting_room_key(i) for i in waiting_ids]):
+            self._loop.call_soon_threadsafe(queue.put_nowait, waiting_message)
+        for queue in self._queues_for([room_key(i) for i in room_ids]):
             self._loop.call_soon_threadsafe(queue.put_nowait, message)
 
     def publish(self, event: CallEvent) -> None:
@@ -188,10 +196,12 @@ class WebSocketCallHub:
 
         message = {"type": "call", "call": display_call_json(display_call)}
 
-        keys: List[MonitorKey] = [waiting_room_key(i) for i in waiting_ids]
-        keys += [room_key(i) for i in room_ids]
-
-        # Snapshot the target queues under the lock, then release it before
-        # scheduling the non-blocking enqueue on the event loop.
-        for queue in self._queues_for(keys):
+        waiting_message = {
+            "type": "call",
+            "call": display_call_json(display_call, include_agenda=False),
+        }
+        # Snapshot target queues under the lock, then enqueue without holding it.
+        for queue in self._queues_for([waiting_room_key(i) for i in waiting_ids]):
+            self._loop.call_soon_threadsafe(queue.put_nowait, waiting_message)
+        for queue in self._queues_for([room_key(i) for i in room_ids]):
             self._loop.call_soon_threadsafe(queue.put_nowait, message)

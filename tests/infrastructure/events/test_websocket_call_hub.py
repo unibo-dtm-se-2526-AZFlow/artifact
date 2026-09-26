@@ -187,7 +187,6 @@ def test_publish_message_carries_only_non_identifying_fields():
     call = _drain(queue)[0]["call"]
     assert set(call.keys()) == {
         "public_call_code",
-        "agenda",
         "state",
         "room_reference",
         "room_label",
