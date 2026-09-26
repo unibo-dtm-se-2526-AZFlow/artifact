@@ -36,6 +36,11 @@ class WebSocketDisplaySupport:
         self.hub = hub
         self._read_model_factory = read_model_factory
 
+    def waiting_room_monitor_label(self, waiting_room_monitor_id: int) -> str | None:
+        """Return the configured WaitingRoomMonitor label."""
+        with self._read_model_factory() as read_model:
+            return read_model.waiting_room_monitor_label(waiting_room_monitor_id)
+
     def waiting_room_monitor_exists(self, waiting_room_monitor_id: int) -> bool:
         """Return whether the WaitingRoomMonitor id is configured."""
         with self._read_model_factory() as read_model:

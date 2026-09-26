@@ -134,6 +134,16 @@ class PostgresDisplayReadModel:
             row = cursor.fetchone()
         return None if row is None else self._to_display_call(row)
 
+    def waiting_room_monitor_label(self, waiting_room_monitor_id: int) -> Optional[str]:
+        """Return the configured WaitingRoomMonitor label, or None."""
+        with self._conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT label FROM waiting_room_monitor WHERE id = %s",
+                (waiting_room_monitor_id,),
+            )
+            row = cursor.fetchone()
+            return None if row is None else row[0]
+
     def waiting_room_monitor_exists(self, waiting_room_monitor_id: int) -> bool:
         """Return whether a WaitingRoomMonitor with this id is configured."""
         with self._conn.cursor() as cursor:
