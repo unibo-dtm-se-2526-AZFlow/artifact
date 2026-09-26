@@ -1,13 +1,8 @@
-"""Shared eligibility and ordering for a Queue's callable candidates.
-
-This is the single source of truth for which candidates a Queue offers and in
-what order. Both the Operator Queue View and Patient Calling use it, so "the
-next Patient" is the head of the same ordered list.
-"""
+"""Shared filtering and ordering for Queue candidates."""
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Set
 
 from AZFlow.application.ports.queue_view_reader import CandidateServiceAccess
 from AZFlow.domain.queue import QueuePolicy
@@ -19,33 +14,53 @@ def callable_ordered(
     served_agenda_ids: List[int],
     policy: QueuePolicy,
 ) -> List[CandidateServiceAccess]:
-    """Return the served, WAITING, de-duplicated candidates ordered by policy."""
-    kept = _filter_candidates(candidates, served_agenda_ids)
-    return _order(kept, policy)
+    """Return served WAITING candidates ordered by Queue policy."""
+    return _filtered_ordered(
+        candidates,
+        served_agenda_ids,
+        policy,
+        {ServiceAccessState.WAITING},
+    )
 
 
-def _filter_candidates(
+def operator_list_ordered(
     candidates: List[CandidateServiceAccess],
     served_agenda_ids: List[int],
+    policy: QueuePolicy,
 ) -> List[CandidateServiceAccess]:
-    """Keep served, WAITING candidates, keeping the first of each id."""
+    """Return WAITING and SUSPENDED entries for the operator LIST."""
+    return _filtered_ordered(
+        candidates,
+        served_agenda_ids,
+        policy,
+        {ServiceAccessState.WAITING, ServiceAccessState.SUSPENDED},
+    )
+
+
+def _filtered_ordered(
+    candidates: List[CandidateServiceAccess],
+    served_agenda_ids: List[int],
+    policy: QueuePolicy,
+    states: Set[ServiceAccessState],
+) -> List[CandidateServiceAccess]:
+    """Filter served candidates by state, de-duplicate them, then order them."""
     served = set(served_agenda_ids)
     seen: Dict[int, CandidateServiceAccess] = {}
     for candidate in candidates:
         if candidate.agenda.id not in served:
             continue
-        if candidate.state is not ServiceAccessState.WAITING:
+        if candidate.state not in states:
             continue
         if candidate.service_access_id not in seen:
             seen[candidate.service_access_id] = candidate
-    return list(seen.values())
+    return _order(list(seen.values()), policy)
 
 
 def _order(
     candidates: List[CandidateServiceAccess],
     policy: QueuePolicy,
 ) -> List[CandidateServiceAccess]:
-    """Order the candidates by the Queue policy."""
+    """Order candidates by Queue policy."""
     if policy is QueuePolicy.BY_APPOINTMENT:
         with_appointment = sorted(
             (c for c in candidates if c.scheduled_at is not None),
@@ -57,8 +72,7 @@ def _order(
         )
         return with_appointment + without_appointment
 
-    # BY_ARRIVAL: composite arrival proxy.
     return sorted(
         candidates,
-        key=lambda c: (c.daily_presence_id, c.service_access_id),
+        key=lambda c: (c.checked_in_at, c.service_access_id),
     )

@@ -20,6 +20,7 @@ def _candidate(
     public_call_code: str = "AAA001",
     scheduled_at: Optional[datetime] = None,
     state: ServiceAccessState = ServiceAccessState.WAITING,
+    checked_in_at: datetime = datetime(2024, 5, 20, 8, 0),
 ) -> CandidateServiceAccess:
     return CandidateServiceAccess(
         service_access_id=service_access_id,
@@ -27,6 +28,7 @@ def _candidate(
         agenda=agenda,
         state=state,
         public_call_code=public_call_code,
+        checked_in_at=checked_in_at,
         scheduled_at=scheduled_at,
     )
 
@@ -76,11 +78,11 @@ def test_by_appointment_places_no_appointment_after_and_orders_by_id():
     assert _ids(result) == [5, 10, 25, 30]
 
 
-def test_by_arrival_orders_by_daily_presence_then_service_access_id():
+def test_by_arrival_orders_by_check_in_time_not_daily_presence_id():
     candidates = [
-        _candidate(50, 3),
-        _candidate(40, 1),
-        _candidate(45, 2),
+        _candidate(50, 1, checked_in_at=_at(10)),
+        _candidate(40, 3, checked_in_at=_at(8)),
+        _candidate(45, 2, checked_in_at=_at(9)),
     ]
 
     result = callable_ordered(candidates, [_AGENDA_A.id], QueuePolicy.BY_ARRIVAL)
@@ -88,11 +90,11 @@ def test_by_arrival_orders_by_daily_presence_then_service_access_id():
     assert _ids(result) == [40, 45, 50]
 
 
-def test_by_arrival_tie_breaks_same_daily_presence_by_service_access_id():
+def test_by_arrival_tie_breaks_same_check_in_time_by_service_access_id():
     candidates = [
-        _candidate(60, 1),
-        _candidate(55, 1),
-        _candidate(70, 2),
+        _candidate(60, 3, checked_in_at=_at(8)),
+        _candidate(55, 1, checked_in_at=_at(8)),
+        _candidate(70, 2, checked_in_at=_at(9)),
     ]
 
     result = callable_ordered(candidates, [_AGENDA_A.id], QueuePolicy.BY_ARRIVAL)
@@ -167,9 +169,9 @@ def test_by_appointment_result_is_stable_regardless_of_input_order(order):
 )
 def test_by_arrival_result_is_stable_regardless_of_input_order(order):
     base = [
-        _candidate(40, 1),
-        _candidate(45, 2),
-        _candidate(50, 3),
+        _candidate(40, 3, checked_in_at=_at(8)),
+        _candidate(45, 1, checked_in_at=_at(9)),
+        _candidate(50, 2, checked_in_at=_at(10)),
     ]
     shuffled = [base[i] for i in order]
 

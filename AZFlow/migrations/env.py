@@ -2,23 +2,24 @@
 
 from __future__ import annotations
 
-import os
-
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+from AZFlow.infrastructure.config import load_settings
 
 config = context.config
 target_metadata = None
 
 
 def database_url() -> str:
-    """Return the configured AZFlow database URL."""
-    url = os.getenv("AZFLOW_DATABASE_URL")
+    """Return the PostgreSQL URL from the shared AZFlow configuration."""
+    url = load_settings().database_url
     if not url:
-        raise RuntimeError("AZFLOW_DATABASE_URL is required to run migrations")
-    if url.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+psycopg://", 1)
-    return url
+        raise RuntimeError(
+            "PostgreSQL is not configured. Set POSTGRES_USER, "
+            "POSTGRES_PASSWORD and POSTGRES_DB."
+        )
+    return url.replace("postgresql://", "postgresql+psycopg://", 1)
 
 
 def run_migrations_offline() -> None:

@@ -255,7 +255,7 @@ class PostgresCheckInRepository:
                         totem_id
                     )
                     VALUES (%s, %s, %s, %s, %s, %s)
-                    RETURNING id
+                    RETURNING id, checked_in_at
                     """,
                     (
                         operational_day,
@@ -266,7 +266,10 @@ class PostgresCheckInRepository:
                         totem_id,
                     ),
                 )
-                daily_presence_id = self._require_returned_id(cursor.fetchone())
+                created = cursor.fetchone()
+                if created is None:
+                    raise RuntimeError("daily presence insert returned no row")
+                daily_presence_id, checked_in_at = created
             self._conn.commit()
         except psycopg.errors.UniqueViolation:
             # Another request created the same presence, so return that one
@@ -285,6 +288,7 @@ class PostgresCheckInRepository:
             operational_day=operational_day,
             public_call_code=public_call_code,
             ticket_master=ticket_master,
+            checked_in_at=checked_in_at,
         )
 
     def find_or_create_service_access(
@@ -368,6 +372,7 @@ class PostgresCheckInRepository:
             SELECT
                 dp.id,
                 dp.public_call_code,
+                dp.checked_in_at,
                 tm.id,
                 tm.prefix
             FROM daily_presence dp
@@ -386,13 +391,16 @@ class PostgresCheckInRepository:
         if row is None:
             return None
 
-        daily_presence_id, public_call_code, ticket_master_id, prefix = row
+        daily_presence_id, public_call_code, checked_in_at, ticket_master_id, prefix = (
+            row
+        )
         return DailyPresence(
             id=daily_presence_id,
             patient_identifier=patient_identifier,
             operational_day=operational_day,
             public_call_code=public_call_code,
             ticket_master=TicketMaster(id=ticket_master_id, prefix=prefix),
+            checked_in_at=checked_in_at,
         )
 
     @staticmethod

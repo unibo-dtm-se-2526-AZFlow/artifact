@@ -39,7 +39,6 @@ _ALL_TABLES = (
     "waiting_room_monitor_scope",
     "waiting_room_monitor",
     "room_monitor",
-    "room_workstation",
     "service_access",
     "ticket_sequence",
     "daily_presence",

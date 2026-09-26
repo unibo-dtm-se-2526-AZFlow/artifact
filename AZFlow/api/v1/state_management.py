@@ -23,15 +23,10 @@ from AZFlow.application.state_management import (
     StateManagementService,
 )
 
+from AZFlow.api.v1.schemas import AgendaModel
+
 
 router = APIRouter()
-
-
-class AgendaModel(BaseModel):
-    """Served Agenda shown in a state-change response"""
-
-    id: int
-    name: str
 
 
 class StateChangeResponse(BaseModel):

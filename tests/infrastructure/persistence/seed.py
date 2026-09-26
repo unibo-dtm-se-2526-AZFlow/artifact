@@ -129,17 +129,6 @@ def seed_room(
     return room_id
 
 
-def seed_room_workstation(conn: "object", room_id: int) -> int:
-    with conn.cursor() as cursor:  # type: ignore[attr-defined]
-        cursor.execute(
-            "INSERT INTO room_workstation (room_id) VALUES (%s) RETURNING id",
-            (room_id,),
-        )
-        workstation_id = cursor.fetchone()[0]
-    conn.commit()  # type: ignore[attr-defined]
-    return workstation_id
-
-
 def seed_room_monitor(conn: "object", room_id: int) -> int:
     with conn.cursor() as cursor:  # type: ignore[attr-defined]
         cursor.execute(

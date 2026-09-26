@@ -23,6 +23,7 @@ class CandidateServiceAccess:
     agenda: Agenda
     state: ServiceAccessState
     public_call_code: str
+    checked_in_at: datetime
     scheduled_at: Optional[datetime] = None
 
 

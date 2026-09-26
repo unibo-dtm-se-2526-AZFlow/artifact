@@ -23,6 +23,7 @@ def _presence():
         operational_day=date(2024, 1, 1),
         public_call_code="AAA001",
         ticket_master=TicketMaster(id=1, prefix="AAA"),
+        checked_in_at=datetime(2024, 5, 20, 8, 0),
     )
 
 

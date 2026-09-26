@@ -36,7 +36,6 @@ from tests.infrastructure.persistence.seed import (
     seed_location_node,
     seed_room,
     seed_room_monitor,
-    seed_room_workstation,
     seed_source,
     seed_ticket_master,
     seed_waiting_room_monitor,
@@ -193,9 +192,6 @@ class _Topology:
         self.room1 = seed_room(conn, node_r1, "ROOM-1", "Room 1")
         self.room3 = seed_room(conn, node_r3, "ROOM-3", "Room 3")
         self.room2 = seed_room(conn, node_r4, "ROOM-2", "Room 2")
-        seed_room_workstation(conn, self.room1)
-        seed_room_workstation(conn, self.room3)
-        seed_room_workstation(conn, self.room2)
 
         # A monitor scoped to Radiotherapy sees ROOM-1 and ROOM-3, not ROOM-2.
         self.waiting_room_monitor = seed_waiting_room_monitor(conn, "WRM Radiotherapy")

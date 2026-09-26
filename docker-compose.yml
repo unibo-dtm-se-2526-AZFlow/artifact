@@ -6,7 +6,11 @@ services:
     environment:
       AZFLOW_API_HOST: ${AZFLOW_API_HOST:-0.0.0.0}
       AZFLOW_API_PORT: ${AZFLOW_API_PORT:-8000}
-      AZFLOW_DATABASE_URL: postgresql://${POSTGRES_USER:-azflow}:${POSTGRES_PASSWORD:-azflow}@postgres:5432/${POSTGRES_DB:-azflow}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-azflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-azflow}
+      POSTGRES_DB: ${POSTGRES_DB:-azflow}
     ports:
       - "${AZFLOW_API_PORT:-8000}:${AZFLOW_API_PORT:-8000}"
 
@@ -26,7 +30,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-azflow}
       POSTGRES_DB: ${POSTGRES_DB:-azflow}
     ports:
-      - "${AZFLOW_DB_HOST_PORT:-55432}:5432"
+      - "${POSTGRES_PORT:-55432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 

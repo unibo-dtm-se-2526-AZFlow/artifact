@@ -1,5 +1,5 @@
 import dataclasses
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
 import pytest
@@ -28,6 +28,7 @@ def _service_access() -> ServiceAccess:
         operational_day=date(2024, 1, 1),
         public_call_code="AAA001",
         ticket_master=ticket_master,
+        checked_in_at=datetime(2024, 5, 20, 8, 0),
     )
     return ServiceAccess(id=12, daily_presence=daily_presence, agenda=_agenda())
 

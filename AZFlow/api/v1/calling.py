@@ -22,6 +22,8 @@ from AZFlow.application.errors import (
     ServiceAccessNotVisibleError,
 )
 
+from AZFlow.api.v1.schemas import AgendaModel
+
 
 router = APIRouter()
 
@@ -30,13 +32,6 @@ class CallRequest(BaseModel):
     """Call context received from the Operator workstation"""
 
     room_reference: str
-
-
-class AgendaModel(BaseModel):
-    """Served Agenda shown in a call response"""
-
-    id: int
-    name: str
 
 
 class CallResponse(BaseModel):
