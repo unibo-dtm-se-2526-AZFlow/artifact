@@ -9,6 +9,8 @@ from AZFlow.application.errors import (
     ApplicationError,
     ServiceAccessNotAdmittableError,
     ServiceAccessNotFoundError,
+    ServiceAccessNotCancellableError,
+    ServiceAccessNotRecallableError,
     ServiceAccessNotRestorableError,
     ServiceAccessNotSuspendableError,
 )
@@ -419,3 +421,32 @@ def test_recall_success_returns_called_and_room(client):
     assert body["room_reference"] == _ROOM_REFERENCE
     assert body["room_label"] == _ROOM_LABEL
     assert service.recall_calls == [12]
+
+
+@pytest.mark.parametrize(
+    ("path", "error"),
+    [
+        (
+            "/api/v1/service-accesses/12/cancel-call",
+            ServiceAccessNotCancellableError(12),
+        ),
+        ("/api/v1/service-accesses/12/recall", ServiceAccessNotRecallableError(12)),
+    ],
+)
+def test_cancel_and_recall_wrong_state_return_conflict(client, path, error):
+    _override(FakeStateManagementService(error=error))
+    response = client.post(path)
+    assert response.status_code == 409
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/service-accesses/12/cancel-call",
+        "/api/v1/service-accesses/12/recall",
+    ],
+)
+def test_cancel_and_recall_not_found_return_404(client, path):
+    _override(FakeStateManagementService(error=ServiceAccessNotFoundError(12)))
+    response = client.post(path)
+    assert response.status_code == 404
