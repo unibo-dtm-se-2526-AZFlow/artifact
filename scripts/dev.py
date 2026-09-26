@@ -72,8 +72,8 @@ def compose(
 
 def start_postgres() -> None:
     """Start PostgreSQL and local development tools via Docker Compose."""
-    print("Starting PostgreSQL and Adminer via Docker Compose...")
-    compose("--profile", "dev", "up", "-d", "postgres", "adminer")
+    print("Starting PostgreSQL and demo services via Docker Compose...")
+    compose("--profile", "dev", "up", "-d", "postgres", "adminer", "demo-web")
 
 
 def wait_for_postgres() -> None:
@@ -99,7 +99,8 @@ def wait_for_postgres() -> None:
         )
         if result.returncode == 0:
             print("PostgreSQL is ready.")
-            print("Adminer available at http://localhost:8080")
+            print("Demo clients available at http://localhost/demo/")
+            print("Adminer available at http://localhost/adminer/")
             return
         time.sleep(READINESS_POLL_INTERVAL_SECONDS)
 
