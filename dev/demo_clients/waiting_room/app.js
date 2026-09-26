@@ -1,7 +1,54 @@
-import { queryInt, websocket } from "../shared/azflow-api.js";
-const monitor=queryInt("monitor",1), connection=document.querySelector("#connection"), container=document.querySelector("#calls");let calls=[];
-function key(c){return `${c.public_call_code}|${c.room_reference}|${c.occurred_at}`;}
-function render(){if(!calls.length){container.innerHTML='<div class="empty">Waiting for calls</div>';return;}container.innerHTML=calls.slice(0,10).map(c=>`<article class="call"><div class="code">${c.public_call_code}</div><div class="room">${c.room_label}</div><div class="agenda">${c.agenda.name}</div></article>`).join("");}
-function add(call){calls=[call,...calls.filter(c=>key(c)!==key(call))].slice(0,10);render();}
-function connect(){const ws=websocket(`/ws/waiting-room-monitors/${monitor}`);ws.onopen=()=>connection.textContent=`Monitor ${monitor} · Live`;ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==="snapshot"){calls=m.calls;render();}if(m.type==="call")add(m.call);};ws.onclose=e=>{connection.textContent=e.code===4004?`Unknown monitor ${monitor}`:"Disconnected · retrying…";if(e.code!==4004)setTimeout(connect,1500);};ws.onerror=()=>ws.close();}
-render();connect();
+import { formatTime, queryInt, websocket } from "../shared/azflow-api.js";
+
+const monitor = queryInt("monitor", 1);
+const connection = document.querySelector("#connection");
+const container = document.querySelector("#calls");
+let calls = [];
+
+function appointment(call) {
+  if (!call.scheduled_at) return "";
+  return `<span class="appointment">${formatTime(call.scheduled_at)}</span>`;
+}
+
+function render() {
+  if (!calls.length) {
+    container.innerHTML = '<div class="empty">Waiting for calls</div>';
+    return;
+  }
+  container.innerHTML = calls.slice(0, 10).map(call => `
+    <article class="call ${call.state === "CALLED" ? "active" : "inactive"}">
+      <div class="ticket"><div class="code">${call.public_call_code}</div>${appointment(call)}</div>
+      <div class="room">${call.room_label}</div>
+      <div class="called-at">${formatTime(call.occurred_at)}</div>
+    </article>`).join("");
+}
+
+function update(call) {
+  calls = [call, ...calls.filter(item => item.public_call_code !== call.public_call_code)]
+    .sort((a, b) => new Date(b.occurred_at) - new Date(a.occurred_at))
+    .slice(0, 10);
+  render();
+}
+
+function connect() {
+  const ws = websocket(`/ws/waiting-room-monitors/${monitor}`);
+  ws.onopen = () => connection.textContent = `Monitor ${monitor} · Live`;
+  ws.onmessage = event => {
+    const message = JSON.parse(event.data);
+    if (message.type === "snapshot") {
+      calls = message.calls;
+      render();
+    }
+    if (message.type === "call" || message.type === "state") update(message.call);
+  };
+  ws.onclose = event => {
+    connection.textContent = event.code === 4004
+      ? `Unknown monitor ${monitor}`
+      : "Disconnected · retrying…";
+    if (event.code !== 4004) setTimeout(connect, 1500);
+  };
+  ws.onerror = () => ws.close();
+}
+
+render();
+connect();
