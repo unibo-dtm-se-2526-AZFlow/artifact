@@ -49,16 +49,6 @@ def is_azflow_process(pid: int) -> bool:
     if "scripts/dev.py" in command or "scripts/debug.py" in command:
         return True
 
-    # Uvicorn's reload worker is a multiprocessing child of scripts/dev.py.
-    if "multiprocessing.spawn" in command:
-        try:
-            parent = int(Path(f"/proc/{pid}/stat").read_text().split()[3])
-        except (FileNotFoundError, PermissionError, ValueError, IndexError):
-            return False
-        return process_cwd(parent) == REPO_ROOT and "scripts/dev.py" in process_command(
-            parent
-        )
-
     return False
 
 
@@ -83,12 +73,7 @@ def main() -> int:
             )
             return 1
 
-        # Stop the reload parent before its worker when both own the socket.
-        ordered = sorted(
-            pids,
-            key=lambda pid: "scripts/dev.py" not in process_command(pid),
-        )
-        for pid in ordered:
+        for pid in sorted(pids):
             try:
                 os.kill(pid, signal.SIGTERM)
                 print(f"Stopped AZFlow process PID {pid}.")

@@ -1,7 +1,7 @@
 """Local development launcher for AZFlow.
 
 Starts PostgreSQL via Docker Compose, waits until it is ready, then runs AZFlow
-with Uvicorn auto-reload.
+with Uvicorn.
 """
 
 from __future__ import annotations
@@ -179,7 +179,7 @@ def seed_database() -> None:
 
 
 def run_azflow() -> None:
-    """Run AZFlow locally with Uvicorn auto-reload."""
+    """Run AZFlow locally with Uvicorn."""
     config = compose_environment()
     for name, value in config.items():
         os.environ[name] = value
@@ -190,7 +190,7 @@ def run_azflow() -> None:
         "AZFlow.api:app",
         host=config["AZFLOW_API_HOST"],
         port=int(config["AZFLOW_API_PORT"]),
-        reload=True,
+        reload=False,
     )
 
 
