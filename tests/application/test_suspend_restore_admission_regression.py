@@ -142,6 +142,23 @@ class _CallingStore:
     def all_candidates(self) -> List[CandidateServiceAccess]:
         return list(self.candidates.values())
 
+    def try_call_suspended(
+        self, service_access_id: int, room_id: int
+    ) -> Optional[ServiceAccess]:
+        candidate = self.candidates.get(service_access_id)
+        if candidate is None or candidate.state is not ServiceAccessState.SUSPENDED:
+            return None
+        self.candidates[service_access_id] = _candidate(
+            candidate.service_access_id,
+            candidate.daily_presence_id,
+            candidate.agenda,
+            candidate.public_call_code,
+            candidate.scheduled_at,
+            ServiceAccessState.CALLED,
+        )
+        access = _service_access(candidate).suspended().restored().called()
+        return access
+
     def try_call(self, service_access_id: int, room_id: int) -> Optional[ServiceAccess]:
         candidate = self.candidates.get(service_access_id)
         if candidate is None:
@@ -198,6 +215,11 @@ class _CallRepository:
 
     def try_call(self, service_access_id: int, room_id: int) -> Optional[ServiceAccess]:
         return self._store.try_call(service_access_id, room_id)
+
+    def try_call_suspended(
+        self, service_access_id: int, room_id: int
+    ) -> Optional[ServiceAccess]:
+        return self._store.try_call_suspended(service_access_id, room_id)
 
 
 class _RecordingPublisher:
@@ -284,20 +306,39 @@ def test_call_next_with_only_suspended_or_admitted_finds_no_patient(excluded_sta
     assert publisher.events == []
 
 
-@pytest.mark.parametrize("excluded_state", _EXCLUDED_STATES)
-def test_call_specific_suspended_or_admitted_is_not_callable(excluded_state):
+def test_call_specific_suspended_calls_directly():
     queue = _queue(1, [_AGENDA_A], QueuePolicy.BY_ARRIVAL)
     service, store, publisher = _build_calling(
         queue,
-        [_candidate(10, 1, public_call_code="AAA001", state=excluded_state)],
+        [
+            _candidate(
+                10, 1, public_call_code="AAA001", state=ServiceAccessState.SUSPENDED
+            )
+        ],
     )
 
-    with pytest.raises(ServiceAccessNotCallableError) as info:
+    result = service.call_specific(1, 10, _ROOM, _DAY)
+
+    assert result.state is ServiceAccessState.CALLED
+    assert store.candidates[10].state is ServiceAccessState.CALLED
+    assert len(publisher.events) == 1
+
+
+def test_call_specific_admitted_is_not_callable():
+    queue = _queue(1, [_AGENDA_A], QueuePolicy.BY_ARRIVAL)
+    service, store, publisher = _build_calling(
+        queue,
+        [
+            _candidate(
+                10, 1, public_call_code="AAA001", state=ServiceAccessState.ADMITTED
+            )
+        ],
+    )
+
+    with pytest.raises(ServiceAccessNotCallableError):
         service.call_specific(1, 10, _ROOM, _DAY)
 
-    assert info.value.service_access_id == 10
-    # The state is unchanged: the conditional transition refused it.
-    assert store.candidates[10].state is excluded_state
+    assert store.candidates[10].state is ServiceAccessState.ADMITTED
     assert publisher.events == []
 
 

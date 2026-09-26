@@ -84,7 +84,12 @@ class PostgresQueueViewReader:
                     sa.state,
                     dp.public_call_code,
                     dp.checked_in_at,
-                    appt.scheduled_at
+                    appt.scheduled_at,
+                    (SELECT t.occurred_at
+                     FROM service_access_transition t
+                     WHERE t.service_access_id = sa.id
+                     ORDER BY t.occurred_at DESC, t.id DESC
+                     LIMIT 1) AS last_transition_at
                 FROM service_access sa
                 JOIN daily_presence dp ON dp.id = sa.daily_presence_id
                 JOIN agenda a ON a.id = sa.agenda_id
@@ -104,6 +109,7 @@ class PostgresQueueViewReader:
                 public_call_code=public_call_code,
                 checked_in_at=checked_in_at,
                 scheduled_at=scheduled_at,
+                last_transition_at=last_transition_at,
             )
             for (
                 service_access_id,
@@ -114,5 +120,6 @@ class PostgresQueueViewReader:
                 public_call_code,
                 checked_in_at,
                 scheduled_at,
+                last_transition_at,
             ) in rows
         ]

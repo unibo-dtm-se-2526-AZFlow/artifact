@@ -2,3 +2,4 @@
 .state-admitted{opacity:.48}.state-called{font-weight:600}.appointment{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}.appointment .dot{width:9px;height:9px;border-radius:50%;background:#238636}.appointment.late .dot{background:#cf222e}
 .current-actions{display:flex;gap:8px}
 .brand-line{display:flex;align-items:baseline;gap:10px}.demo-label{font-size:12px;font-weight:750;letter-spacing:.035em;color:#8793a0}
+.last-event{display:grid;gap:2px}.last-event small{color:#697586;font-size:11px;font-weight:500}

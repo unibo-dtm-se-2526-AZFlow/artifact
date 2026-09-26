@@ -29,7 +29,7 @@ async function loadDiscovery() {
 
 function actions(entry) {
   if (entry.state === "WAITING") return `<button data-action="call" data-id="${entry.service_access_id}">Call</button><button class="secondary" data-action="suspend" data-id="${entry.service_access_id}">Suspend</button>`;
-  if (entry.state === "SUSPENDED") return `<button class="secondary" data-action="restore" data-id="${entry.service_access_id}">Restore</button>`;
+  if (entry.state === "SUSPENDED") return `<button data-action="call" data-id="${entry.service_access_id}">Call</button><button class="secondary" data-action="restore" data-id="${entry.service_access_id}">Restore</button>`;
   if (entry.state === "CALLED") return `<button class="secondary" data-action="cancel-call" data-id="${entry.service_access_id}">Cancel</button><button data-action="admission" data-id="${entry.service_access_id}">Admit</button>`;
   if (entry.state === "ADMITTED") return `<button data-action="recall" data-id="${entry.service_access_id}">Recall</button>`;
   return "";
@@ -42,12 +42,18 @@ function appointment(entry, queuePolicy) {
   return `<span class="appointment ${timing}"><span class="dot"></span>${formatTime(entry.scheduled_at)}</span>`;
 }
 
+function lastEvent(entry) {
+  if (!entry.last_event_at) return "—";
+  const label = entry.state === "ADMITTED" ? "Admitted" : "Called";
+  return `<span class="last-event"><strong>${formatTime(entry.last_event_at)}</strong><small>${label}</small></span>`;
+}
+
 async function refresh() {
   if (!queue.value) return;
   try {
     const data = await api(`/queues/${queue.value}/operator-list`);
     policy.textContent = data.policy;
-    entries.innerHTML = data.entries.map(e => `<tr class="state-${e.state.toLowerCase()}"><td><strong>${e.public_call_code}</strong></td><td>${e.agenda.name}</td><td><span class="badge">${e.state}</span></td><td>${formatTime(e.checked_in_at)}</td><td>${appointment(e, data.policy)}</td><td><div class="row-actions">${actions(e)}</div></td></tr>`).join("");
+    entries.innerHTML = data.entries.map(e => `<tr class="state-${e.state.toLowerCase()}"><td><strong>${e.public_call_code}</strong></td><td>${e.agenda.name}</td><td><span class="badge">${e.state}</span></td><td>${formatTime(e.checked_in_at)}</td><td>${appointment(e, data.policy)}</td><td>${lastEvent(e)}</td><td><div class="row-actions">${actions(e)}</div></td></tr>`).join("");
     if (!data.entries.length) entries.innerHTML = '<tr><td colspan="6" class="muted">No patients for this queue today.</td></tr>';
     setStatus(`Queue updated at ${new Date().toLocaleTimeString()}`);
   } catch (error) { setStatus(error.message, true); }

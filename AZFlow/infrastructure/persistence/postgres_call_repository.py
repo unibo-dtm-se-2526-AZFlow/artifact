@@ -50,6 +50,16 @@ class PostgresCallRepository:
         return row[0]
 
     def try_call(self, service_access_id: int, room_id: int) -> Optional[ServiceAccess]:
+        return self._try_call_from(service_access_id, room_id, "WAITING")
+
+    def try_call_suspended(
+        self, service_access_id: int, room_id: int
+    ) -> Optional[ServiceAccess]:
+        return self._try_call_from(service_access_id, room_id, "SUSPENDED")
+
+    def _try_call_from(
+        self, service_access_id: int, room_id: int, previous_state: str
+    ) -> Optional[ServiceAccess]:
         """Try the WAITING to CALLED transition of one ServiceAccess.
 
         Runs a single atomic conditional UPDATE that also sets the call-time
@@ -64,10 +74,10 @@ class PostgresCallRepository:
                     """
                     UPDATE service_access
                     SET state = 'CALLED', room_id = %s
-                    WHERE id = %s AND state = 'WAITING'
+                    WHERE id = %s AND state = %s
                     RETURNING id, daily_presence_id, agenda_id, appointment_id
                     """,
-                    (room_id, service_access_id),
+                    (room_id, service_access_id, previous_state),
                 )
                 updated = cursor.fetchone()
                 if updated is None:
@@ -79,9 +89,9 @@ class PostgresCallRepository:
                     """
                     INSERT INTO service_access_transition
                         (service_access_id, previous_state, resulting_state)
-                    VALUES (%s, 'WAITING', 'CALLED')
+                    VALUES (%s, %s, 'CALLED')
                     """,
-                    (access_id,),
+                    (access_id, previous_state),
                 )
                 daily_presence = load_daily_presence(cursor, daily_presence_id)
                 agenda = load_agenda(cursor, agenda_id)
