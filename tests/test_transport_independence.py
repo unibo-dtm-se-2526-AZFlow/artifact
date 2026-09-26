@@ -168,6 +168,7 @@ def test_display_call_field_set_is_stable():
         "room_reference",
         "room_label",
         "occurred_at",
+        "scheduled_at",
     }
     # The occurred_at field is a plain datetime, not a transport object.
     now = datetime.now(timezone.utc)
