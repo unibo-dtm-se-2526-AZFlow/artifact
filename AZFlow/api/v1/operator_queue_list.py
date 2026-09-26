@@ -30,6 +30,7 @@ class OperatorQueueListEntryModel(BaseModel):
     checked_in_at: datetime
     scheduled_at: Optional[datetime] = None
     last_event_at: Optional[datetime] = None
+    first_called_at: Optional[datetime] = None
 
 
 class OperatorQueueListResponse(BaseModel):
@@ -87,6 +88,7 @@ def view_operator_queue_list(
                 checked_in_at=entry.checked_in_at,
                 scheduled_at=entry.scheduled_at,
                 last_event_at=entry.last_event_at,
+                first_called_at=entry.first_called_at,
             )
             for entry in view.entries
         ],

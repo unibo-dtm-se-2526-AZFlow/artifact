@@ -32,6 +32,7 @@ class OperatorQueueListEntry:
     checked_in_at: datetime
     scheduled_at: Optional[datetime] = None
     last_event_at: Optional[datetime] = None
+    first_called_at: Optional[datetime] = None
 
 
 @dataclass(frozen=True)
@@ -90,4 +91,5 @@ class OperatorQueueListService:
             if candidate.state
             in (ServiceAccessState.CALLED, ServiceAccessState.ADMITTED)
             else None,
+            first_called_at=candidate.first_called_at,
         )
