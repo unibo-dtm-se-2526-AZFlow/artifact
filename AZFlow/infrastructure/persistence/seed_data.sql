@@ -70,9 +70,6 @@ INSERT INTO room (id, room_reference, label, location_node_id) VALUES
     (2, 'ROOM-2',  'Room 2',  5),
     (3, 'ROOM-11', 'Room 11', 6);
 
-INSERT INTO room_workstation (id, room_id) VALUES
-    (1, 1), (2, 2), (3, 3);
-
 INSERT INTO room_monitor (id, room_id) VALUES
     (1, 1), (2, 2), (3, 3);
 
@@ -196,8 +193,6 @@ SELECT setval(pg_get_serial_sequence('totem', 'id'),
               (SELECT MAX(id) FROM totem));
 SELECT setval(pg_get_serial_sequence('room', 'id'),
               (SELECT MAX(id) FROM room));
-SELECT setval(pg_get_serial_sequence('room_workstation', 'id'),
-              (SELECT MAX(id) FROM room_workstation));
 SELECT setval(pg_get_serial_sequence('room_monitor', 'id'),
               (SELECT MAX(id) FROM room_monitor));
 SELECT setval(pg_get_serial_sequence('waiting_room_monitor', 'id'),
