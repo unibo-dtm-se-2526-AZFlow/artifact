@@ -42,7 +42,7 @@ compile = { cmd = "python -m compileall AZFlow tests", help = "Compile Python so
 static-checks = { sequence = ["ruff-check", "mypy"], help = "Run linting and static type checks" }
 dev = { cmd = "python scripts/dev.py", help = "Start PostgreSQL, Adminer, demo gateway, and AZFlow for development" }
 dev-reset = { cmd = "python scripts/dev.py reset", help = "Recreate, migrate, and seed the development database (deletes existing data)" }
-stop = { cmd = "python scripts/stop.py", help = "Stop AZFlow and all development services without deleting database data" }
+dev-stop = { cmd = "python scripts/stop.py", help = "Stop AZFlow and all development services without deleting database data" }
 db-upgrade = { cmd = "alembic upgrade head", help = "Upgrade the configured database to the latest migration" }
 db-current = { cmd = "alembic current", help = "Show the current database migration revision" }
 db-history = { cmd = "alembic history", help = "Show the database migration history" }
