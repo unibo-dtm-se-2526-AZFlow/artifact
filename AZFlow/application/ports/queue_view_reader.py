@@ -25,6 +25,8 @@ class CandidateServiceAccess:
     public_call_code: str
     checked_in_at: datetime
     scheduled_at: Optional[datetime] = None
+    last_transition_at: Optional[datetime] = None
+    first_called_at: Optional[datetime] = None
 
 
 class QueueViewReader(Protocol):

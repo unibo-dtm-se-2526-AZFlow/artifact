@@ -22,6 +22,7 @@ _ALLOWED_FIELDS = {
     "room_reference",
     "room_label",
     "occurred_at",
+    "scheduled_at",
 }
 
 # Field names that would signal a leaked patient identifier.

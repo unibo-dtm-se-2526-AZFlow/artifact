@@ -23,7 +23,7 @@ from AZFlow.domain.service_access import ServiceAccessState
 
 @dataclass(frozen=True)
 class OperatorQueueListEntry:
-    """One WAITING or SUSPENDED entry visible to the operator."""
+    """One daily ServiceAccess visible to the operator."""
 
     service_access_id: int
     public_call_code: str
@@ -31,6 +31,8 @@ class OperatorQueueListEntry:
     state: ServiceAccessState
     checked_in_at: datetime
     scheduled_at: Optional[datetime] = None
+    last_event_at: Optional[datetime] = None
+    first_called_at: Optional[datetime] = None
 
 
 @dataclass(frozen=True)
@@ -85,4 +87,9 @@ class OperatorQueueListService:
             state=candidate.state,
             checked_in_at=candidate.checked_in_at,
             scheduled_at=candidate.scheduled_at,
+            last_event_at=candidate.last_transition_at
+            if candidate.state
+            in (ServiceAccessState.CALLED, ServiceAccessState.ADMITTED)
+            else None,
+            first_called_at=candidate.first_called_at,
         )

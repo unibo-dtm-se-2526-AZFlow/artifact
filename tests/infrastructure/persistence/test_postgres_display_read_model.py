@@ -642,6 +642,7 @@ def test_display_call_exposes_only_non_identifying_fields(connection):
         "room_reference",
         "room_label",
         "occurred_at",
+        "scheduled_at",
     }
     assert set(vars(call).keys()) == expected_fields
 

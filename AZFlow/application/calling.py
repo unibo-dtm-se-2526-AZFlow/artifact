@@ -142,7 +142,12 @@ class CallingService:
 
         self._require_public_call_code(target.public_call_code, service_access_id)
 
-        called = self._call_repository.try_call(service_access_id, room_id)
+        if target.state == ServiceAccessState.SUSPENDED:
+            called = self._call_repository.try_call_suspended(
+                service_access_id, room_id
+            )
+        else:
+            called = self._call_repository.try_call(service_access_id, room_id)
         if called is None:
             raise ServiceAccessNotCallableError(service_access_id)
         return self._succeed(target.public_call_code, called, room_reference)

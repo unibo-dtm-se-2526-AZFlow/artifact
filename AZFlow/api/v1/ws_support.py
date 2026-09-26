@@ -36,6 +36,11 @@ class WebSocketDisplaySupport:
         self.hub = hub
         self._read_model_factory = read_model_factory
 
+    def waiting_room_monitor_label(self, waiting_room_monitor_id: int) -> str | None:
+        """Return the configured WaitingRoomMonitor label."""
+        with self._read_model_factory() as read_model:
+            return read_model.waiting_room_monitor_label(waiting_room_monitor_id)
+
     def waiting_room_monitor_exists(self, waiting_room_monitor_id: int) -> bool:
         """Return whether the WaitingRoomMonitor id is configured."""
         with self._read_model_factory() as read_model:
@@ -54,7 +59,7 @@ class WebSocketDisplaySupport:
             calls = read_model.recent_calls_for_monitor(
                 waiting_room_monitor_id, date.today()
             )
-        return [display_call_json(call) for call in calls]
+        return [display_call_json(call, include_agenda=False) for call in calls]
 
     def latest_call_snapshot(self, room_monitor_id: int) -> List[Dict[str, Any]]:
         """Return the latest-call snapshot as zero or one JSON item."""

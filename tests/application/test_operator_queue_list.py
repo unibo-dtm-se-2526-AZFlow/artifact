@@ -57,7 +57,7 @@ def test_list_contains_waiting_and_suspended_with_state():
     assert view.entries[0].checked_in_at == datetime(2024, 5, 20, 8, 0)
 
 
-def test_list_excludes_called_and_admitted():
+def test_list_keeps_called_first_and_admitted_last():
     service = _service(
         [
             _candidate(1, ServiceAccessState.WAITING, datetime(2024, 5, 20, 9)),
@@ -68,7 +68,7 @@ def test_list_excludes_called_and_admitted():
 
     view = service.view(1, _DAY)
 
-    assert [entry.service_access_id for entry in view.entries] == [1]
+    assert [entry.service_access_id for entry in view.entries] == [2, 1, 3]
 
 
 def test_suspended_entry_keeps_normal_queue_position():

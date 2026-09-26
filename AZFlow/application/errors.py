@@ -106,6 +106,22 @@ class ServiceAccessNotAdmittableError(ApplicationError):
         super().__init__()
 
 
+class ServiceAccessNotCancellableError(ApplicationError):
+    """Raised when the target ServiceAccess exists but is not CALLED."""
+
+    def __init__(self, service_access_id: int) -> None:
+        self.service_access_id = service_access_id
+        super().__init__()
+
+
+class ServiceAccessNotRecallableError(ApplicationError):
+    """Raised when the target ServiceAccess exists but is not ADMITTED."""
+
+    def __init__(self, service_access_id: int) -> None:
+        self.service_access_id = service_access_id
+        super().__init__()
+
+
 class RoomNotFoundError(ApplicationError):
     """Raised when the supplied room reference does not resolve to a configured Room."""
 

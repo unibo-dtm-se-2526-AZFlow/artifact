@@ -32,3 +32,9 @@ class CallRepository(Protocol):
         locks are used.
         """
         ...
+
+    def try_call_suspended(
+        self, service_access_id: int, room_id: int
+    ) -> Optional[ServiceAccess]:
+        """Atomically transition SUSPENDED to CALLED and set the Room."""
+        ...
