@@ -15,10 +15,12 @@ from fastapi import FastAPI, HTTPException, status
 from AZFlow.api.v1.calling import get_calling_service
 from AZFlow.api.v1.check_in import get_check_in_service
 from AZFlow.api.v1.displays import get_display_read_model
+from AZFlow.api.v1.operator_queue_list import get_operator_queue_list_service
 from AZFlow.api.v1.queue_view import get_queue_view_service
 from AZFlow.api.v1.state_management import get_state_management_service
 from AZFlow.application.calling import CallingService
 from AZFlow.application.check_in import CheckInService
+from AZFlow.application.operator_queue_list import OperatorQueueListService
 from AZFlow.application.ports.call_event_publisher import CallEventPublisher
 from AZFlow.application.ports.display_read_model import DisplayReadModel
 from AZFlow.application.queue_view import QueueViewService
@@ -112,6 +114,35 @@ def build_queue_view_service_provider(
             yield QueueViewService(reader)
 
     return provide_queue_view_service
+
+
+def build_operator_queue_list_service_provider(
+    database_url: object,
+) -> Callable[[], Iterator[OperatorQueueListService]]:
+    """Build the expanded operator LIST dependency for each request."""
+
+    def provide_operator_queue_list_service() -> Iterator[OperatorQueueListService]:
+        if not database_url:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="operator queue list service is not configured",
+            )
+
+        import psycopg
+
+        with psycopg.connect(str(database_url)) as connection:
+            reader = PostgresQueueViewReader(connection)
+            yield OperatorQueueListService(reader)
+
+    return provide_operator_queue_list_service
+
+
+def wire_operator_queue_list(application: FastAPI) -> None:
+    """Connect the expanded operator LIST to the FastAPI application."""
+    settings = load_settings()
+    application.dependency_overrides[get_operator_queue_list_service] = (
+        build_operator_queue_list_service_provider(settings.database_url)
+    )
 
 
 def wire_queue_view(application: FastAPI) -> None:

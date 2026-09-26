@@ -10,6 +10,7 @@ from AZFlow.api.composition import (
     wire_calling,
     wire_check_in,
     wire_display_read_model,
+    wire_operator_queue_list,
     wire_queue_view,
     wire_state_management,
 )
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     application.include_router(v1_router)
     wire_check_in(application)
     wire_queue_view(application)
+    wire_operator_queue_list(application)
     wire_calling(application)
     wire_state_management(application)
     wire_display_read_model(application)
