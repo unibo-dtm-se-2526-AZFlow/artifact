@@ -3,6 +3,7 @@ import { formatTime, queryInt, websocket } from "../shared/azflow-api.js";
 const monitor = queryInt("monitor", 1);
 const connection = document.querySelector("#connection");
 const container = document.querySelector("#calls");
+const label = document.querySelector("#waiting-room-label");
 let calls = [];
 
 function appointment(call) {
@@ -36,6 +37,7 @@ function connect() {
   ws.onmessage = event => {
     const message = JSON.parse(event.data);
     if (message.type === "snapshot") {
+      if (message.label) label.textContent = message.label;
       calls = message.calls;
       render();
     }
