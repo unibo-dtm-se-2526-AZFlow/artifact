@@ -66,6 +66,7 @@ def display_call_json(call: DisplayCall) -> Dict[str, Any]:
         "room_reference": call.room_reference,
         "room_label": call.room_label,
         "occurred_at": call.occurred_at.isoformat(),
+        "scheduled_at": call.scheduled_at.isoformat() if call.scheduled_at else None,
     }
 
 

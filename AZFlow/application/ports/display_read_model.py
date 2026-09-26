@@ -24,6 +24,7 @@ class DisplayCall:
     room_reference: str
     room_label: str
     occurred_at: datetime
+    scheduled_at: Optional[datetime] = None
 
 
 class DisplayReadModel(Protocol):
@@ -53,8 +54,8 @@ class DisplayReadModel(Protocol):
     ) -> Optional[DisplayCall]:
         """Return the latest call for a configured RoomMonitor's Room.
 
-        It is the single latest call for the current operational day, or None
-        when there is none.
+        It is the latest currently CALLED access for the Room, or None when
+        there is no active call.
         """
         ...
 
