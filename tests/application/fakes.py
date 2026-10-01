@@ -9,6 +9,7 @@ from datetime import date, datetime
 from typing import Dict, List, Mapping, Optional, Tuple
 
 from AZFlow.application.ports.appointment_source import ExternalAppointmentData
+from AZFlow.application.ports.call_event_publisher import CallEvent
 from AZFlow.application.ports.check_in_repository import (
     ResolvedAgenda,
     format_public_call_code,
@@ -22,6 +23,16 @@ from AZFlow.domain.daily_presence import DailyPresence
 from AZFlow.domain.patient_identifier import PatientIdentifier
 from AZFlow.domain.service_access import ServiceAccess, ServiceAccessState
 from AZFlow.domain.ticket_master import TicketMaster
+
+
+class CallEventPublisherSpy:
+    """Record published call events for test assertions."""
+
+    def __init__(self) -> None:
+        self.events: List[CallEvent] = []
+
+    def publish(self, event: CallEvent) -> None:
+        self.events.append(event)
 
 
 class ListAppointmentSource:

@@ -42,12 +42,6 @@ from AZFlow.application.calling import CallingService
 from AZFlow.application.check_in import CheckInService
 from AZFlow.application.state_management import StateManagementService
 from AZFlow.infrastructure.appointment_sources.mock import MockAppointmentSource
-from AZFlow.infrastructure.events.composite_publisher import (
-    CompositeCallEventPublisher,
-)
-from AZFlow.infrastructure.events.in_process_publisher import (
-    InProcessCallEventPublisher,
-)
 from AZFlow.infrastructure.events.websocket_call_hub import WebSocketCallHub
 from AZFlow.infrastructure.persistence.postgres_call_repository import (
     PostgresCallRepository,
@@ -135,7 +129,7 @@ def _seed_topology(connection) -> _Seeded:
 
 @pytest.fixture
 def wired_client(connection, dsn: str) -> Iterator[TestClient]:
-    """Wire the real services over the test DB, with the composite + hub."""
+    """Wire the real services over the test DB and WebSocket hub."""
     seeded = _seed_topology(connection)
 
     appointment_source = MockAppointmentSource()
@@ -146,7 +140,6 @@ def wired_client(connection, dsn: str) -> Iterator[TestClient]:
             yield PostgresDisplayReadModel(request_connection, 10)
 
     hub = WebSocketCallHub(open_read_model)
-    publisher = CompositeCallEventPublisher([InProcessCallEventPublisher(), hub])
 
     def provide_check_in() -> Iterator[CheckInService]:
         with psycopg.connect(dsn) as request_connection:
@@ -157,7 +150,7 @@ def wired_client(connection, dsn: str) -> Iterator[TestClient]:
         with psycopg.connect(dsn) as request_connection:
             reader = PostgresQueueViewReader(request_connection)
             repository = PostgresCallRepository(request_connection)
-            yield CallingService(reader, repository, publisher)
+            yield CallingService(reader, repository, hub)
 
     def provide_state_management() -> Iterator[StateManagementService]:
         with psycopg.connect(dsn) as request_connection:

@@ -27,9 +27,7 @@ from AZFlow.application.errors import (
     ServiceAccessNotCallableError,
 )
 from AZFlow.domain.service_access import ServiceAccessState
-from AZFlow.infrastructure.events.in_process_publisher import (
-    InProcessCallEventPublisher,
-)
+from tests.application.fakes import CallEventPublisherSpy
 from AZFlow.infrastructure.persistence.postgres_call_repository import (
     PostgresCallRepository,
 )
@@ -322,10 +320,10 @@ def test_concurrent_try_call_on_same_waiting_access_transitions_once(connection,
 
 def _make_calling_service(connection):
     """Build a CallingService over the given connection with a real reader,
-    repository and a recording in-process publisher."""
+    repository and a recording publisher spy."""
     reader = PostgresQueueViewReader(connection)
     repo = PostgresCallRepository(connection)
-    publisher = InProcessCallEventPublisher()
+    publisher = CallEventPublisherSpy()
     service = CallingService(reader, repo, publisher)
     return service, publisher
 
@@ -463,7 +461,7 @@ def test_missing_public_call_code_leaves_row_waiting_and_publishes_no_event(
 
     reader = PostgresQueueViewReader(connection)
     repo = PostgresCallRepository(connection)
-    publisher = InProcessCallEventPublisher()
+    publisher = CallEventPublisherSpy()
     service = CallingService(reader, repo, publisher)
 
     with pytest.raises(MissingPublicCallCodeError):
@@ -494,7 +492,7 @@ def test_unknown_room_reference_raises_and_writes_nothing(connection):
 
     reader = PostgresQueueViewReader(connection)
     repo = PostgresCallRepository(connection)
-    publisher = InProcessCallEventPublisher()
+    publisher = CallEventPublisherSpy()
     service = CallingService(reader, repo, publisher)
 
     with pytest.raises(RoomNotFoundError):

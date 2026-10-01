@@ -31,9 +31,7 @@ from AZFlow.application.calling import CallingService
 from AZFlow.application.check_in import CheckInService
 from AZFlow.application.state_management import StateManagementService
 from AZFlow.infrastructure.appointment_sources.mock import MockAppointmentSource
-from AZFlow.infrastructure.events.in_process_publisher import (
-    InProcessCallEventPublisher,
-)
+from tests.application.fakes import CallEventPublisherSpy
 from AZFlow.infrastructure.persistence.postgres_call_repository import (
     PostgresCallRepository,
 )
@@ -85,7 +83,7 @@ def wired_client(connection, dsn: str) -> Iterator[TestClient]:
     seed_room(connection, node_id, _ROOM, "Room 3")
 
     appointment_source = MockAppointmentSource()
-    publisher = InProcessCallEventPublisher()
+    publisher = CallEventPublisherSpy()
 
     def provide_check_in() -> Iterator[CheckInService]:
         with psycopg.connect(dsn) as request_connection:
