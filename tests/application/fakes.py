@@ -5,6 +5,7 @@ They let the application services run without PostgreSQL.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Dict, List, Mapping, Optional, Tuple
 
@@ -15,7 +16,6 @@ from AZFlow.application.ports.check_in_repository import (
     format_public_call_code,
 )
 from AZFlow.application.ports.queue_view_reader import CandidateServiceAccess
-from AZFlow.application.transition_history import TransitionRecord
 from AZFlow.domain.agenda import Agenda, ExternalAgenda
 from AZFlow.domain.queue import Queue
 from AZFlow.domain.appointment import Appointment
@@ -23,6 +23,16 @@ from AZFlow.domain.daily_presence import DailyPresence
 from AZFlow.domain.patient_identifier import PatientIdentifier
 from AZFlow.domain.service_access import ServiceAccess, ServiceAccessState
 from AZFlow.domain.ticket_master import TicketMaster
+
+
+@dataclass(frozen=True)
+class TransitionRecord:
+    """Recorded state transition used by in-memory test fakes."""
+
+    service_access_id: int
+    previous_state: Optional[ServiceAccessState]
+    resulting_state: ServiceAccessState
+    occurred_at: datetime
 
 
 class CallEventPublisherSpy:
