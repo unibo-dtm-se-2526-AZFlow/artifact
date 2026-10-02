@@ -118,6 +118,10 @@ class CheckInService:
 
         return CheckInResult(daily_presence=daily_presence)
 
+    def validate_totem(self, totem_id: int) -> None:
+        """Reject a Totem id that is not configured."""
+        self._require_totem(totem_id)
+
     def _require_totem(self, totem_id: Optional[int]) -> None:
         """Reject an unknown Totem before creating any check-in data"""
         if totem_id is not None and not self._repository.totem_exists(totem_id):

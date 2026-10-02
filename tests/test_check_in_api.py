@@ -169,6 +169,24 @@ def test_public_call_code_does_not_contain_submitted_identifier(client):
 # 10.1-10.4: no response exposes the Patient Identifier).
 
 
+def test_totem_validation_accepts_configured_id(client):
+    _override(_service_with_totem({1: 1}))
+
+    response = client.get("/api/v1/totems/1")
+
+    assert response.status_code == 200
+    assert response.json() is None
+
+
+def test_totem_validation_rejects_unknown_id(client):
+    _override(_service_with_totem({1: 1}))
+
+    response = client.get("/api/v1/totems/2")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Totem id is not configured"}
+
+
 def test_check_in_with_valid_totem_id_succeeds(client):
     _override(_service_with_totem({1: 1}))
 
