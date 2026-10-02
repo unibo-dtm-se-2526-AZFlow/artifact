@@ -64,8 +64,8 @@ class CheckInRepository(Protocol):
         """Return the configured agenda and its active queues, if found"""
         ...
 
-    def resolve_totem(self, totem_reference: str) -> Optional[int]:
-        """Return the configured Totem id for a reference, or None when unknown"""
+    def totem_exists(self, totem_id: int) -> bool:
+        """Return whether the Totem id is configured"""
         ...
 
     def find_or_create_appointment(

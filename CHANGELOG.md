@@ -1,3 +1,63 @@
+## [1.2.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v1.1.0...v1.2.0) (2026-09-26)
+
+### Features
+
+* **calling:** call suspended access directly ([aba775a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/aba775a0f947139ed89d0fbd8a8729eef023ef10))
+* **db:** add queue policy catalog ([a3a32df](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/a3a32df4280befe4251b5c0bd64de6ab45322bcf))
+* **demo:** add development web gateway ([161ece5](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/161ece5fe124b55850914ecd80d04ffebbef2a1e))
+* **demo:** clear inactive room display ([1ce9d2e](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/1ce9d2e93766b40cb555bed774fa262486ef0c61))
+* **demo:** proxy API documentation through gateway ([7fa76da](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/7fa76da9ef23ea4fbc38500f5be695e4a738b237))
+* **demo:** refresh waiting room call history ([f34d1e7](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/f34d1e732e36176a3dab3b57b50018a5916d24cd))
+* **demo:** show operator event time and suspended call ([12966ca](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/12966ca6678a2a4a3cb4854418fe75f4427071a5))
+* **demo:** show waiting room label ([559f121](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/559f1213208b1a56c69f9166f36c0dafe7319ed2))
+* **demo:** update operator call controls ([49f12fe](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/49f12feb8502eec10c745db174690599b4cd41af))
+* **dev:** add development environment stop task ([8980722](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/8980722c0edee981186e361c71b328c688dbda86))
+* **dev:** start demo gateway with development environment ([c1128fd](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/c1128fd894a3efff35fb114750365bc540496500))
+* **display:** expose current call state and appointment time ([09442ea](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/09442eaf9f0d95f121f5c12897376e68cc6474e8))
+* **display:** expose waiting room label ([fb3f702](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/fb3f70285b0fba086194bfe6fb3c0c87afc879b6))
+* **display:** publish state changes to monitors ([ea2d76a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/ea2d76a82aa5c53ceb27a39f242d0f1aef07d021))
+* **operator:** expose latest call event time ([699e4a3](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/699e4a37163ed57280fbf8007d1130cd89110c8b))
+* **operator:** keep daily accesses in operator list ([e598048](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/e5980487c9aa43b9632cc0d533f582a6e650d235))
+* **state:** add cancel call and recall transitions ([fbb323f](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/fbb323f0fc1ae28405e866ac9751abbec2139786))
+
+### Bug Fixes
+
+* **dev:** disable application auto-reload ([6282201](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/6282201166a5d484dd315f1f4ac1b1c90acf9fdc))
+* **dev:** manage demo gateway lifecycle ([84c0302](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/84c03029877c00ea5c0e3142daafdc82a0436f23))
+* **dev:** rename stop task to dev-stop ([7a609de](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/7a609def7ce111fbad99fddee11011140ac2a996))
+* **display:** omit agenda from waiting room payloads ([6e3b56a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/6e3b56a0d96b171796fce6fc8fe414785e2a3776))
+* **operator:** preserve call timing indicator ([f5dc409](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/f5dc40925870a57fd60130bdf78d67ede7fc6507))
+* **tests:** satisfy static type checks ([6075b8e](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/6075b8e43e699e9bd8999c6d63aeb75818f97838))
+
+### Documentation
+
+* **demo:** document browser demo clients ([e90539b](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/e90539bc777b3ec1c4875ef261ddc29ae7f9e57a))
+* **demo:** document development gateway ([c33ddb3](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/c33ddb390f5e088a180947f5bdcd0c647630d3f6))
+* **release:** align documentation with 1.2 ([4c4f27e](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/4c4f27e2ce1be4217f10c95ea564ff9e251bdc93))
+
+### Tests
+
+* **calling:** cover direct suspended call ([1a1dbcc](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/1a1dbcc90c89d78b7c15df49209df5ffb70b7f8a))
+* **db:** detect queue policy catalog drift ([25ae16a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/25ae16a992b456bf5ac3dba202eaca5f0c67c3f9))
+* **display:** cover appointment time metadata ([579cfa4](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/579cfa4d4086423c9ce65c6a072e4aa2dc740656))
+* **display:** cover monitor state transition loop ([fc2ae9a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/fc2ae9a62ae68592f25fc3560a099f371b88e0ea))
+* **operator:** cover called and admitted list entries ([25f704f](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/25f704f77052cb38a8f9aea64dd90db4ad3267c9))
+* **state:** cover cancel call and recall contracts ([237c68d](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/237c68d60f904dd98ffd0732e9a1466ec60a6227))
+
+### General maintenance
+
+* **demo:** add check-in totem web client ([c2f769a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/c2f769af9d9a4bde28968104be5c39e0c361c8c5))
+* **demo:** add operator web client ([fa8f739](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/fa8f73931d4fd5cdf26ca3fcc0d92a2dc53a5505))
+* **demo:** add room display web client ([6ee8e83](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/6ee8e8304d6514cc684f4fff3c9915a308d62bdb))
+* **demo:** add shared browser client assets ([3ccee4a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/3ccee4a6bf6df8d6871f97eeb990f5c3a3111c14))
+* **demo:** add waiting room web client ([f0e55b4](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/f0e55b4bc37850459fdcba0b4899872477aa4ade))
+* **demo:** refresh operator queue automatically ([341af71](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/341af717fa4e726d21397a218356099e2b53cac6))
+
+### Style improvements
+
+* **demo:** align client headers and waiting room columns ([e822dfa](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/e822dfa1e673d23f2900504cc3069c869289411e))
+* **demo:** distinguish operator queue states ([cbe2cd3](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/cbe2cd319d875d718976f662eef36bb87b8b26c0))
+
 ## [1.1.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v1.0.1...v1.1.0) (2026-09-26)
 
 ### Features

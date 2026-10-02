@@ -5,16 +5,17 @@ They let the application services run without PostgreSQL.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Dict, List, Mapping, Optional, Tuple
 
 from AZFlow.application.ports.appointment_source import ExternalAppointmentData
+from AZFlow.application.ports.call_event_publisher import CallEvent
 from AZFlow.application.ports.check_in_repository import (
     ResolvedAgenda,
     format_public_call_code,
 )
 from AZFlow.application.ports.queue_view_reader import CandidateServiceAccess
-from AZFlow.application.transition_history import TransitionRecord
 from AZFlow.domain.agenda import Agenda, ExternalAgenda
 from AZFlow.domain.queue import Queue
 from AZFlow.domain.appointment import Appointment
@@ -22,6 +23,26 @@ from AZFlow.domain.daily_presence import DailyPresence
 from AZFlow.domain.patient_identifier import PatientIdentifier
 from AZFlow.domain.service_access import ServiceAccess, ServiceAccessState
 from AZFlow.domain.ticket_master import TicketMaster
+
+
+@dataclass(frozen=True)
+class TransitionRecord:
+    """Recorded state transition used by in-memory test fakes."""
+
+    service_access_id: int
+    previous_state: Optional[ServiceAccessState]
+    resulting_state: ServiceAccessState
+    occurred_at: datetime
+
+
+class CallEventPublisherSpy:
+    """Record published call events for test assertions."""
+
+    def __init__(self) -> None:
+        self.events: List[CallEvent] = []
+
+    def publish(self, event: CallEvent) -> None:
+        self.events.append(event)
 
 
 class ListAppointmentSource:
@@ -54,11 +75,11 @@ class FakeCheckInRepository:
     def __init__(
         self,
         resolutions: Mapping[Tuple[str, str], ResolvedAgenda],
-        totems: Optional[Mapping[str, int]] = None,
+        totems: Optional[Mapping[int, int]] = None,
     ) -> None:
         self._resolutions: Dict[Tuple[str, str], ResolvedAgenda] = dict(resolutions)
-        # Known Totem references map to a configured Totem id; others resolve to None.
-        self._totems: Dict[str, int] = dict(totems or {})
+        # Configured Totem ids are used to validate the optional check-in origin.
+        self._totems: Dict[int, int] = dict(totems or {})
 
         self._next_appointment_id = 1
         # Recognize appointments by stable source-specific reference.
@@ -87,8 +108,8 @@ class FakeCheckInRepository:
     ) -> Optional[ResolvedAgenda]:
         return self._resolutions.get((external_source_code, external_agenda_reference))
 
-    def resolve_totem(self, totem_reference: str) -> Optional[int]:
-        return self._totems.get(totem_reference)
+    def totem_exists(self, totem_id: int) -> bool:
+        return totem_id in self._totems
 
     def find_or_create_appointment(
         self,

@@ -130,9 +130,9 @@ class RoomNotFoundError(ApplicationError):
         super().__init__()
 
 
-class InvalidTotemReferenceError(ApplicationError):
-    """Raised when a supplied Totem reference does not resolve to a configured Totem."""
+class InvalidTotemIdError(ApplicationError):
+    """Raised when a supplied Totem id does not resolve to a configured Totem."""
 
-    def __init__(self, totem_reference: str) -> None:
-        self.totem_reference = totem_reference
+    def __init__(self, totem_id: int) -> None:
+        self.totem_id = totem_id
         super().__init__()

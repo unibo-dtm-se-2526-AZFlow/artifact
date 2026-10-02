@@ -4,6 +4,8 @@ AZFlow is a healthcare queue management system for outpatient environments.
 
 It originates from a real healthcare use case: managing the patient journey from arrival and check-in to queue handling and access to the healthcare service. The project is developed as part of the Software Engineering course of the Digital Transformation Management programme at the University of Bologna, with the goal of keeping the model suitable for further evolution beyond the university project.
 
+The complete project documentation is available at [AZFlow Documentation](https://unibo-dtm-se-2526-azflow.github.io/report/). For package installation and production-oriented usage, see the [AZFlow package on TestPyPI](https://test.pypi.org/project/AZFlow/). The development setup below is intended for running the complete local development and demo environment.
+
 ## The idea
 
 AZFlow is not a traditional ticket-only queue system.
@@ -43,35 +45,110 @@ Poetry manages the Python environment and dependencies, while pytest, Ruff and m
 
 ## Development
 
-Install the dependencies:
+### Prerequisites
+
+AZFlow requires:
+
+- Python `>= 3.10` and `< 4.0`
+- Docker with Docker Compose V2
+- Git
+
+### Setup
+
+Clone the repository and install Poetry and the project dependencies:
 
 ~~~bash
-pip install -r requirements.txt
+git clone <repository-url>
+cd artifact
+python3.12 -m pip install -r requirements.txt
 poetry install
 ~~~
 
-Start AZFlow locally:
+`python3.12` can be replaced with any installed Python version supported by
+AZFlow.
+
+Create the local environment configuration:
+
+~~~bash
+cp .env.example .env
+~~~
+
+The default configuration is suitable for local development. Adjust `.env` if
+different ports or database settings are required.
+
+Prepare the deterministic demo database:
+
+~~~bash
+poetry run poe dev-reset
+~~~
+
+This recreates the local database, applies all pending Alembic migrations and
+loads the demo data. Then start AZFlow:
 
 ~~~bash
 poetry run poe dev
 ~~~
 
 The development launcher starts PostgreSQL, Adminer and the demo web gateway,
-applies all pending Alembic migrations, and then starts AZFlow. It does not
-load demo data during a normal start.
+applies any pending migrations, and then starts AZFlow. A normal `dev` start
+preserves the existing database and does not reload demo data.
 
-After a demo reset, the browser clients are available through the development
-gateway at `http://localhost/demo/`. The demo includes an operator station, a
-check-in Totem, Room displays and waiting-room displays. AZFlow and Swagger
-remain directly available at `http://localhost:8000` and
-`http://localhost:8000/docs`.
+The seeded data supports a set of repeatable scenarios covering check-in, Queue
+ordering, calling, admission, suspension, display propagation and topology.
+See [`docs/demo-scenarios.md`](docs/demo-scenarios.md) for the complete demo
+script and the expected result of each scenario.
 
-To recreate the local development database from scratch, apply the migrations,
-and load the demo data:
+### Development URLs
 
-~~~bash
-poetry run poe dev-reset
+The development gateway is available on the standard HTTP port (`80`).
+
+| Client / service | URL | Configuration |
+| --- | --- | --- |
+| Swagger UI | `http://localhost/docs` | — |
+| Adminer | `http://localhost/adminer/` | — |
+| Totem | `http://localhost/demo/totem/?id=1` | `id` selects the Totem |
+| Operator | `http://localhost/demo/operator/?room=1&queue=1` | `room` selects the Room; `queue` selects the Queue |
+| Waiting room display | `http://localhost/demo/waiting_room/?id=1` | `id` selects the WaitingRoomMonitor |
+| Room display | `http://localhost/demo/room_display/?id=1` | `id` selects the RoomMonitor |
+
+The deterministic demo seed provides Rooms `1-3`, RoomMonitors `1-3`,
+WaitingRoomMonitors `1-4` and Totem `1`. Operator and display clients can
+be opened in multiple browser tabs with different URL parameters to represent
+different workstations and displays.
+
+AZFlow is also directly available at `http://localhost:8000`, with Swagger UI
+at `http://localhost:8000/docs`.
+
+### Demo topology
+
+The deterministic demo represents a small hospital with two floors. Devices and
+Rooms are arranged as follows:
+
+~~~text
+HOSPITAL
+├── Totem 1 [Totem id=1]
+├── BAR [WaitingRoomMonitor id=4]
+├── Ground Floor
+│   ├── Waiting Room 1 [WaitingRoomMonitor id=1]
+│   ├── Waiting Room 2 [WaitingRoomMonitor id=2]
+│   ├── Room 1 [RoomMonitor id=1]
+│   └── Room 2 [RoomMonitor id=2]
+└── First Floor
+    ├── Waiting Room 11 [WaitingRoomMonitor id=3]
+    └── Room 11 [RoomMonitor id=3]
 ~~~
+
+The topology is functional, not only descriptive: waiting-room monitors receive
+calls for Rooms covered by their position in the topology, while Room displays
+show calls for their own Room. `BAR`, attached at hospital level, receives calls
+from all Rooms.
+
+The seeded snapshot represents the system in the middle of a working day, with
+Patients already progressing through the workflow and additional appointments
+still available for check-in. See `docs/demo-scenarios.md` for the complete
+demonstration scenarios.
+
+### Development commands
 
 Run the portable test suite:
 
@@ -85,6 +162,22 @@ Run the complete suite with the local integration test environment:
 poetry run poe test-integration
 ~~~
 
+Run the portable test suite with coverage and show the report:
+
+~~~bash
+poetry run poe coverage
+poetry run poe coverage-report
+~~~
+
+To generate a browsable HTML coverage report:
+
+~~~bash
+poetry run poe coverage-html
+~~~
+
+The HTML report is written to `htmlcov/` and can be opened locally to inspect
+coverage down to individual source lines.
+
 Static checks and formatting can be verified with:
 
 ~~~bash
@@ -92,7 +185,16 @@ poetry run poe static-checks
 poetry run poe format-check
 ~~~
 
-Continuous integration verifies the project on the supported Python versions and operating systems, with dedicated integration tests for infrastructure adapters. Integration tests use a fresh PostgreSQL database and apply the Alembic migrations before running.
+Stop AZFlow and the development services without deleting database data:
+
+~~~bash
+poetry run poe dev-stop
+~~~
+
+Continuous integration verifies the project on the supported Python versions
+and operating systems, with dedicated integration tests for infrastructure
+adapters. Integration tests use a fresh PostgreSQL database and apply the
+Alembic migrations before running.
 
 ## Database migrations
 

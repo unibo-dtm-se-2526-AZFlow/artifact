@@ -487,19 +487,15 @@ def test_idempotent_service_access_reuse_writes_no_extra_history(connection):
         assert cursor.fetchone()[0] == 1
 
 
-def test_resolve_totem_returns_id_for_configured_reference(connection):
-    """Validates: Requirements 3.4, 3.5, 3.6.
-
-    A configured Totem resolves to its id, and an unknown reference resolves to
-    None.
-    """
+def test_totem_exists_checks_configured_id(connection):
+    """Validates: Requirements 3.4, 3.5, 3.6."""
     node_id = seed_location_node(connection, "Site A")
     totem_id = seed_totem(connection, node_id, "TOTEM-1")
 
     repo = PostgresCheckInRepository(connection)
 
-    assert repo.resolve_totem("TOTEM-1") == totem_id
-    assert repo.resolve_totem("UNKNOWN") is None
+    assert repo.totem_exists(totem_id) is True
+    assert repo.totem_exists(totem_id + 1) is False
 
 
 def test_daily_presence_persists_resolved_totem_origin(connection):

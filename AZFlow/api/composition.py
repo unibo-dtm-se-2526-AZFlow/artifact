@@ -29,12 +29,6 @@ from AZFlow.application.state_management import StateManagementService
 from AZFlow.infrastructure.appointment_sources.mock import MockAppointmentSource
 from AZFlow.infrastructure.config import load_settings
 from AZFlow.api.v1.ws_support import WebSocketDisplaySupport, set_ws_support
-from AZFlow.infrastructure.events.composite_publisher import (
-    CompositeCallEventPublisher,
-)
-from AZFlow.infrastructure.events.in_process_publisher import (
-    InProcessCallEventPublisher,
-)
 from AZFlow.infrastructure.events.websocket_call_hub import WebSocketCallHub
 from AZFlow.infrastructure.persistence.postgres_call_repository import (
     PostgresCallRepository,
@@ -289,9 +283,9 @@ def build_display_read_model_factory(
 def wire_calling(application: FastAPI) -> None:
     """Connect the Patient Calling service to the FastAPI application
 
-    The single publication seam fans out to the in-process publisher and the
-    WebSocket hub through a CompositeCallEventPublisher. The calling service
-    still receives a CallEventPublisher, so the core is unaware of WebSockets.
+    Call events are published through the shared WebSocket hub. The calling
+    service still receives a CallEventPublisher, so the core is unaware of
+    WebSockets.
     The shared hub is stored on the application state and bound to the running
     event loop at startup. Tests can replace this dependency with a fake.
     """
@@ -301,13 +295,12 @@ def wire_calling(application: FastAPI) -> None:
         settings.database_url, settings.display_recent_calls_max
     )
     hub = WebSocketCallHub(read_model_factory)
-    publisher = CompositeCallEventPublisher([InProcessCallEventPublisher(), hub])
 
     application.state.ws_call_hub = hub
     set_ws_support(application, WebSocketDisplaySupport(hub, read_model_factory))
 
     application.dependency_overrides[get_calling_service] = (
-        build_calling_service_provider(settings.database_url, publisher)
+        build_calling_service_provider(settings.database_url, hub)
     )
 
 
