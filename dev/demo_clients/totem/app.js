@@ -9,3 +9,16 @@ document.querySelector("#form").addEventListener("submit", async event => {
   } catch(error){ status.textContent=error.message; status.classList.add("error"); }
 });
 document.querySelector("#again").addEventListener("click",()=>{success.classList.add("hidden");formView.classList.remove("hidden");status.textContent="";input.value="";input.focus();});
+
+async function validateTotem() {
+  try {
+    await api("/totems/" + totemId);
+  } catch (error) {
+    input.disabled = true;
+    document.querySelector("#form button").disabled = true;
+    status.textContent = "Totem " + totemId + ": " + error.message;
+    status.classList.add("error");
+  }
+}
+
+await validateTotem();

@@ -49,6 +49,26 @@ def get_check_in_service() -> CheckInService:
     )
 
 
+@router.get("/totems/{totem_id}")
+def validate_totem(
+    totem_id: int,
+    service: CheckInService = Depends(get_check_in_service),
+) -> None:
+    """Validate a Totem id used to configure a kiosk client."""
+    if totem_id <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Totem id must be greater than zero",
+        )
+    try:
+        service.validate_totem(totem_id)
+    except InvalidTotemIdError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Totem id is not configured",
+        ) from error
+
+
 @router.post(
     "/check-ins",
     response_model=CheckInResponse,
