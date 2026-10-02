@@ -1,6 +1,6 @@
 import { queryInt, websocket } from "../shared/azflow-api.js";
 
-const monitor = queryInt("monitor", 1);
+const monitor = queryInt("id", 1);
 const connection = document.querySelector("#connection");
 const panel = document.querySelector("#call");
 const code = document.querySelector("#code");

@@ -1,6 +1,6 @@
 import { formatTime, queryInt, websocket } from "../shared/azflow-api.js";
 
-const monitor = queryInt("monitor", 1);
+const monitor = queryInt("id", 1);
 const connection = document.querySelector("#connection");
 const container = document.querySelector("#calls");
 const label = document.querySelector("#waiting-room-label");
