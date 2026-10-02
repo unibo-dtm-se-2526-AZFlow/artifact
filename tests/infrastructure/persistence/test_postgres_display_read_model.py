@@ -24,7 +24,9 @@ They cover:
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Tuple
+from typing import Optional, Tuple
+
+import pytest
 
 from AZFlow.application.ports.display_read_model import DisplayCall
 from AZFlow.domain.service_access import ServiceAccessState
@@ -36,6 +38,7 @@ from tests.infrastructure.persistence.seed import (
     seed_location_node,
     seed_room,
     seed_room_monitor,
+    seed_queue,
     seed_source,
     seed_ticket_master,
     seed_waiting_room_monitor,
@@ -91,6 +94,7 @@ def _seed_service_access(
     agenda_id: int,
     room_id: int,
     state: str = "CALLED",
+    appointment_id: Optional[int] = None,
 ) -> int:
     """Insert a service_access row with a call-time room and return its id."""
     with conn.cursor() as cursor:  # type: ignore[attr-defined]
@@ -99,10 +103,10 @@ def _seed_service_access(
             INSERT INTO service_access (
                 daily_presence_id, agenda_id, appointment_id, state, room_id
             )
-            VALUES (%s, %s, NULL, %s, %s)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING id
             """,
-            (daily_presence_id, agenda_id, state, room_id),
+            (daily_presence_id, agenda_id, appointment_id, state, room_id),
         )
         service_access_id = cursor.fetchone()[0]
     conn.commit()  # type: ignore[attr-defined]
@@ -115,18 +119,19 @@ def _seed_transition(
     resulting_state: str,
     occurred_at: datetime,
     previous_state: "str | None" = None,
+    queue_id: "int | None" = None,
 ) -> int:
     """Insert a transition row with an explicit occurred_at and return its id."""
     with conn.cursor() as cursor:  # type: ignore[attr-defined]
         cursor.execute(
             """
             INSERT INTO service_access_transition (
-                service_access_id, previous_state, resulting_state, occurred_at
+                service_access_id, previous_state, resulting_state, occurred_at, queue_id
             )
-            VALUES (%s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING id
             """,
-            (service_access_id, previous_state, resulting_state, occurred_at),
+            (service_access_id, previous_state, resulting_state, occurred_at, queue_id),
         )
         transition_id = cursor.fetchone()[0]
     conn.commit()  # type: ignore[attr-defined]
@@ -691,3 +696,85 @@ def test_admission_does_not_remove_earlier_call_from_recent_calls(connection):
     codes = [call.public_call_code for call in calls]
     assert codes == ["AAA001"]
     assert all(call.state is ServiceAccessState.CALLED for call in calls)
+
+
+@pytest.mark.parametrize(
+    ("call_policy", "expected_scheduled_at"),
+    [
+        ("BY_ARRIVAL", None),
+        ("BY_APPOINTMENT", _at(10, 20)),
+    ],
+)
+def test_waiting_room_appointment_time_follows_originating_queue_policy(
+    connection, call_policy, expected_scheduled_at
+):
+    """The same access may be visible through Queues with different policies.
+
+    The waiting-room projection uses the Queue that actually originated the
+    call, not another Queue serving the same Agenda.
+    """
+    topology = _Topology(connection)
+    source = seed_source(connection)
+    external_agenda = seed_external_agenda(
+        connection, source, "Cardiology", "AGENDA-POLICY"
+    )
+    ticket_master = seed_ticket_master(connection, "POL")
+    by_arrival = seed_queue(
+        connection, ticket_master, [external_agenda.agenda.id], policy="BY_ARRIVAL"
+    )
+    by_appointment = seed_queue(
+        connection,
+        ticket_master,
+        [external_agenda.agenda.id],
+        policy="BY_APPOINTMENT",
+    )
+    selected_queue = by_appointment if call_policy == "BY_APPOINTMENT" else by_arrival
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id FROM external_agenda
+            WHERE agenda_id = %s AND external_source_id = %s
+            """,
+            (external_agenda.agenda.id, source.id),
+        )
+        external_agenda_id = cursor.fetchone()[0]
+        cursor.execute(
+            """
+            INSERT INTO appointment (
+                scheduled_at, patient_identifier_type, patient_identifier_value,
+                external_agenda_id, external_appointment_reference
+            )
+            VALUES (%s, 'fiscal_code', %s, %s, 'APPT-POLICY')
+            RETURNING id
+            """,
+            (_at(10, 20), PATIENT_IDENTIFIER, external_agenda_id),
+        )
+        appointment_id = cursor.fetchone()[0]
+    connection.commit()
+
+    presence_id = _seed_daily_presence(
+        connection, ticket_master.id, "POL001", OPERATIONAL_DAY
+    )
+    access_id = _seed_service_access(
+        connection,
+        presence_id,
+        external_agenda.agenda.id,
+        topology.room1,
+        appointment_id=appointment_id,
+    )
+    _seed_transition(
+        connection,
+        access_id,
+        "CALLED",
+        _at(10, 25),
+        previous_state="WAITING",
+        queue_id=selected_queue,
+    )
+
+    calls = PostgresDisplayReadModel(connection, 10).recent_calls_for_monitor(
+        topology.waiting_room_monitor, OPERATIONAL_DAY
+    )
+
+    assert len(calls) == 1
+    assert calls[0].scheduled_at == expected_scheduled_at

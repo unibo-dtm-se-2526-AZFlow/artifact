@@ -44,7 +44,7 @@ class PostgresDisplayReadModel:
                     JOIN scope_nodes s ON ln.parent_id = s.id
                 ), latest_calls AS (
                     SELECT DISTINCT ON (t.service_access_id)
-                           t.service_access_id, t.occurred_at, t.id
+                           t.service_access_id, t.occurred_at, t.id, t.queue_id
                     FROM service_access_transition t
                     JOIN service_access sa ON sa.id = t.service_access_id
                     JOIN daily_presence dp ON dp.id = sa.daily_presence_id
@@ -55,13 +55,16 @@ class PostgresDisplayReadModel:
                     ORDER BY t.service_access_id, t.occurred_at DESC, t.id DESC
                 )
                 SELECT dp.public_call_code, a.id, a.name, sa.state,
-                       r.room_reference, r.label, lc.occurred_at, ap.scheduled_at
+                       r.room_reference, r.label, lc.occurred_at,
+                       CASE WHEN q.policy = 'BY_APPOINTMENT'
+                            THEN ap.scheduled_at END
                 FROM latest_calls lc
                 JOIN service_access sa ON sa.id = lc.service_access_id
                 JOIN daily_presence dp ON dp.id = sa.daily_presence_id
                 JOIN agenda a ON a.id = sa.agenda_id
                 JOIN room r ON r.id = sa.room_id
                 LEFT JOIN appointment ap ON ap.id = sa.appointment_id
+                LEFT JOIN queue q ON q.id = lc.queue_id
                 ORDER BY lc.occurred_at DESC, lc.id DESC
                 LIMIT %(max_size)s
                 """,
@@ -82,7 +85,9 @@ class PostgresDisplayReadModel:
             cursor.execute(
                 """
                 SELECT dp.public_call_code, a.id, a.name, sa.state,
-                       r.room_reference, r.label, t.occurred_at, ap.scheduled_at
+                       r.room_reference, r.label, t.occurred_at,
+                       CASE WHEN q.policy = 'BY_APPOINTMENT'
+                            THEN ap.scheduled_at END
                 FROM room_monitor rm
                 JOIN room r ON r.id = rm.room_id
                 JOIN service_access sa ON sa.room_id = r.id
@@ -90,6 +95,7 @@ class PostgresDisplayReadModel:
                 JOIN daily_presence dp ON dp.id = sa.daily_presence_id
                 JOIN agenda a ON a.id = sa.agenda_id
                 LEFT JOIN appointment ap ON ap.id = sa.appointment_id
+                LEFT JOIN queue q ON q.id = t.queue_id
                 WHERE rm.id = %(room_monitor_id)s
                   AND sa.state = 'CALLED'
                   AND t.resulting_state = 'CALLED'
@@ -113,13 +119,16 @@ class PostgresDisplayReadModel:
             cursor.execute(
                 """
                 SELECT dp.public_call_code, a.id, a.name, sa.state,
-                       r.room_reference, r.label, t.occurred_at, ap.scheduled_at
+                       r.room_reference, r.label, t.occurred_at,
+                       CASE WHEN q.policy = 'BY_APPOINTMENT'
+                            THEN ap.scheduled_at END
                 FROM service_access sa
                 JOIN service_access_transition t ON t.service_access_id = sa.id
                 JOIN room r ON r.id = sa.room_id
                 JOIN daily_presence dp ON dp.id = sa.daily_presence_id
                 JOIN agenda a ON a.id = sa.agenda_id
                 LEFT JOIN appointment ap ON ap.id = sa.appointment_id
+                LEFT JOIN queue q ON q.id = t.queue_id
                 WHERE sa.id = %(service_access_id)s
                   AND t.resulting_state = 'CALLED'
                   AND dp.operational_day = %(operational_day)s

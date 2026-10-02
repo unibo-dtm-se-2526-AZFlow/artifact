@@ -153,7 +153,9 @@ class _Store:
             result.append(candidate)
         return result
 
-    def try_call(self, service_access_id: int, room_id: int) -> Optional[ServiceAccess]:
+    def try_call(
+        self, service_access_id: int, room_id: int, queue_id: int
+    ) -> Optional[ServiceAccess]:
         candidate = self.candidates.get(service_access_id)
         if candidate is None:
             return None
@@ -226,13 +228,15 @@ class FakeCallRepository:
         self.resolve_room_calls.append(room_reference)
         return self.known_rooms.get(room_reference)
 
-    def try_call(self, service_access_id: int, room_id: int) -> Optional[ServiceAccess]:
+    def try_call(
+        self, service_access_id: int, room_id: int, queue_id: int
+    ) -> Optional[ServiceAccess]:
         self.try_call_ids.append(service_access_id)
         self.try_call_room_ids.append(room_id)
-        return self._store.try_call(service_access_id, room_id)
+        return self._store.try_call(service_access_id, room_id, queue_id)
 
     def try_call_suspended(
-        self, service_access_id: int, room_id: int
+        self, service_access_id: int, room_id: int, queue_id: int
     ) -> Optional[ServiceAccess]:
         return None
 

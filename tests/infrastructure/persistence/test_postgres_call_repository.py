@@ -171,6 +171,23 @@ def _read_room_id(conn: "object", service_access_id: int) -> Optional[int]:
         return cursor.fetchone()[0]
 
 
+def _read_call_queue_id(conn: "object", service_access_id: int) -> Optional[int]:
+    """Read the Queue persisted on the latest CALLED transition."""
+    with conn.cursor() as cursor:  # type: ignore[attr-defined]
+        cursor.execute(
+            """
+            SELECT queue_id
+            FROM service_access_transition
+            WHERE service_access_id = %s AND resulting_state = 'CALLED'
+            ORDER BY occurred_at DESC, id DESC
+            LIMIT 1
+            """,
+            (service_access_id,),
+        )
+        row = cursor.fetchone()
+        return None if row is None else row[0]
+
+
 def _seed_configured_room(conn: "object", reference: str = ROOM_REFERENCE) -> int:
     """Seed a LocationNode and a configured Room, and return the Room id."""
     node_id = seed_location_node(conn, "Radiotherapy")
@@ -203,12 +220,13 @@ def test_try_call_persists_called_state_durably(connection):
     source = seed_source(connection)
     agenda = seed_external_agenda(connection, source, "Cardiology", "AGENDA-A").agenda
     ticket_master = seed_ticket_master(connection, "AAA")
+    queue_id = seed_queue(connection, ticket_master, [agenda.id])
     dp_id = _seed_daily_presence(connection, ticket_master.id, "AAA001")
     sa_id = _seed_service_access(connection, dp_id, agenda.id, None)
     room_id = _seed_configured_room(connection)
 
     repo = PostgresCallRepository(connection)
-    called = repo.try_call(sa_id, room_id)
+    called = repo.try_call(sa_id, room_id, queue_id)
 
     assert called is not None
     assert called.id == sa_id
@@ -225,16 +243,18 @@ def test_try_call_persists_room_and_one_transition_record(connection):
     source = seed_source(connection)
     agenda = seed_external_agenda(connection, source, "Cardiology", "AGENDA-A").agenda
     ticket_master = seed_ticket_master(connection, "AAA")
+    queue_id = seed_queue(connection, ticket_master, [agenda.id])
     dp_id = _seed_daily_presence(connection, ticket_master.id, "AAA001")
     sa_id = _seed_service_access(connection, dp_id, agenda.id, None)
     room_id = _seed_configured_room(connection)
 
     repo = PostgresCallRepository(connection)
-    called = repo.try_call(sa_id, room_id)
+    called = repo.try_call(sa_id, room_id, queue_id)
     assert called is not None
 
     # The passed Room is persisted on the ServiceAccess.
     assert _read_room_id(connection, sa_id) == room_id
+    assert _read_call_queue_id(connection, sa_id) == queue_id
 
     # Exactly one WAITING->CALLED record, with a non-null occurred_at.
     rows = _transition_rows(connection, sa_id)
@@ -250,19 +270,20 @@ def test_try_call_returns_row_for_waiting_and_none_for_called(connection):
     source = seed_source(connection)
     agenda = seed_external_agenda(connection, source, "Cardiology", "AGENDA-A").agenda
     ticket_master = seed_ticket_master(connection, "AAA")
+    queue_id = seed_queue(connection, ticket_master, [agenda.id])
     dp_id = _seed_daily_presence(connection, ticket_master.id, "AAA001")
     sa_id = _seed_service_access(connection, dp_id, agenda.id, None)
     room_id = _seed_configured_room(connection)
 
     repo = PostgresCallRepository(connection)
 
-    first = repo.try_call(sa_id, room_id)
+    first = repo.try_call(sa_id, room_id, queue_id)
     assert first is not None
     assert first.state is ServiceAccessState.CALLED
 
     # A second attempt on an already-CALLED target performs no transition, adds
     # no transition record and does not change the stored room_id.
-    second = repo.try_call(sa_id, room_id)
+    second = repo.try_call(sa_id, room_id, queue_id)
     assert second is None
     assert _read_state(connection, sa_id) == "CALLED"
     assert _read_room_id(connection, sa_id) == room_id
@@ -289,6 +310,7 @@ def test_concurrent_try_call_on_same_waiting_access_transitions_once(connection,
     source = seed_source(connection)
     agenda = seed_external_agenda(connection, source, "Cardiology", "AGENDA-A").agenda
     ticket_master = seed_ticket_master(connection, "AAA")
+    queue_id = seed_queue(connection, ticket_master, [agenda.id])
     dp_id = _seed_daily_presence(connection, ticket_master.id, "AAA001")
     sa_id = _seed_service_access(connection, dp_id, agenda.id, None)
     room_id = _seed_configured_room(connection)
@@ -299,7 +321,7 @@ def test_concurrent_try_call_on_same_waiting_access_transitions_once(connection,
         with psycopg.connect(dsn) as worker_connection:
             worker_repo = PostgresCallRepository(worker_connection)
             barrier.wait(timeout=10)
-            called = worker_repo.try_call(sa_id, room_id)
+            called = worker_repo.try_call(sa_id, room_id, queue_id)
             return called is not None
 
     with ThreadPoolExecutor(max_workers=2) as executor:

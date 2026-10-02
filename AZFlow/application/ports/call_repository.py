@@ -22,7 +22,9 @@ class CallRepository(Protocol):
         """
         ...
 
-    def try_call(self, service_access_id: int, room_id: int) -> Optional[ServiceAccess]:
+    def try_call(
+        self, service_access_id: int, room_id: int, queue_id: int
+    ) -> Optional[ServiceAccess]:
         """Try the WAITING to CALLED transition of one ServiceAccess.
 
         A successful call is a single atomic conditional WAITING to CALLED
@@ -34,7 +36,7 @@ class CallRepository(Protocol):
         ...
 
     def try_call_suspended(
-        self, service_access_id: int, room_id: int
+        self, service_access_id: int, room_id: int, queue_id: int
     ) -> Optional[ServiceAccess]:
         """Atomically transition SUSPENDED to CALLED and set the Room."""
         ...

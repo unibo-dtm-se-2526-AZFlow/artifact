@@ -101,7 +101,9 @@ class CallingService:
                 head.public_call_code, head.service_access_id
             )
 
-            called = self._call_repository.try_call(head.service_access_id, room_id)
+            called = self._call_repository.try_call(
+                head.service_access_id, room_id, queue_id
+            )
             if called is None:
                 # The head raced to CALLED; try the next current head.
                 continue
@@ -144,10 +146,12 @@ class CallingService:
 
         if target.state == ServiceAccessState.SUSPENDED:
             called = self._call_repository.try_call_suspended(
-                service_access_id, room_id
+                service_access_id, room_id, queue_id
             )
         else:
-            called = self._call_repository.try_call(service_access_id, room_id)
+            called = self._call_repository.try_call(
+                service_access_id, room_id, queue_id
+            )
         if called is None:
             raise ServiceAccessNotCallableError(service_access_id)
         return self._succeed(target.public_call_code, called, room_reference)

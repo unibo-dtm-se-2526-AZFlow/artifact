@@ -145,13 +145,14 @@ FROM generate_series(1, 30) AS n;
 
 -- Every previously called Patient has a WAITING -> CALLED history record.
 INSERT INTO service_access_transition (
-    service_access_id, previous_state, resulting_state, occurred_at
+    service_access_id, previous_state, resulting_state, occurred_at, queue_id
 )
 SELECT
     n,
     'WAITING',
     'CALLED',
-    CURRENT_DATE + TIME '08:25' + n * INTERVAL '4 minutes'
+    CURRENT_DATE + TIME '08:25' + n * INTERVAL '4 minutes',
+    ((n - 1) % 5) + 1
 FROM generate_series(1, 20) AS n;
 
 -- The first 17 have also entered their Room.
