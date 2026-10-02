@@ -75,11 +75,11 @@ class FakeCheckInRepository:
     def __init__(
         self,
         resolutions: Mapping[Tuple[str, str], ResolvedAgenda],
-        totems: Optional[Mapping[str, int]] = None,
+        totems: Optional[Mapping[int, int]] = None,
     ) -> None:
         self._resolutions: Dict[Tuple[str, str], ResolvedAgenda] = dict(resolutions)
-        # Known Totem references map to a configured Totem id; others resolve to None.
-        self._totems: Dict[str, int] = dict(totems or {})
+        # Configured Totem ids are used to validate the optional check-in origin.
+        self._totems: Dict[int, int] = dict(totems or {})
 
         self._next_appointment_id = 1
         # Recognize appointments by stable source-specific reference.
@@ -108,8 +108,8 @@ class FakeCheckInRepository:
     ) -> Optional[ResolvedAgenda]:
         return self._resolutions.get((external_source_code, external_agenda_reference))
 
-    def resolve_totem(self, totem_reference: str) -> Optional[int]:
-        return self._totems.get(totem_reference)
+    def totem_exists(self, totem_id: int) -> bool:
+        return totem_id in self._totems
 
     def find_or_create_appointment(
         self,

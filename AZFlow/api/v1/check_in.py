@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from AZFlow.application.check_in import CheckInService
 from AZFlow.application.errors import (
-    InvalidTotemReferenceError,
+    InvalidTotemIdError,
     NoAppointmentAvailableError,
     UnsupportedIdentifierTypeError,
 )
@@ -29,7 +29,7 @@ class CheckInRequest(BaseModel):
 
     identifier_type: str = Field(min_length=1)
     identifier_value: str = Field(min_length=1)
-    totem_reference: Optional[str] = None
+    totem_id: Optional[int] = Field(default=None, gt=0)
 
 
 class CheckInResponse(BaseModel):
@@ -71,10 +71,8 @@ def check_in(
         ) from error
 
     try:
-        if request.totem_reference is not None:
-            result = service.check_in(
-                patient_identifier, totem_reference=request.totem_reference
-            )
+        if request.totem_id is not None:
+            result = service.check_in(patient_identifier, totem_id=request.totem_id)
         else:
             result = service.check_in(patient_identifier)
     except UnsupportedIdentifierTypeError as error:
@@ -83,11 +81,11 @@ def check_in(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(f"unsupported patient identifier type: {error.identifier_type!r}"),
         ) from error
-    except InvalidTotemReferenceError as error:
+    except InvalidTotemIdError as error:
         # Keep the message generic so no identifying data can leak.
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="totem reference is not configured",
+            detail="Totem id is not configured",
         ) from error
     except NoAppointmentAvailableError as error:
         raise HTTPException(
