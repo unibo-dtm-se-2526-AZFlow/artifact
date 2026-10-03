@@ -137,7 +137,12 @@ SELECT
         ELSE 'WAITING'
     END,
     CASE
+        -- Keep the three active calls on distinct Rooms. Historical ADMITTED
+        -- accesses may share Rooms because they are no longer current calls.
         WHEN n > 20 THEN NULL
+        WHEN n = 18 THEN 1
+        WHEN n = 19 THEN 2
+        WHEN n = 20 THEN 3
         WHEN ((n - 1) % 5) + 1 = 1 THEN 1
         WHEN ((n - 1) % 5) + 1 = 2 THEN 2
         ELSE 3
