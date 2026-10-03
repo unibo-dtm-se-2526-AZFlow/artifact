@@ -6,6 +6,16 @@ const container = document.querySelector("#calls");
 const label = document.querySelector("#waiting-room-label");
 let calls = [];
 
+function compareCalls(a, b) {
+  const activeDifference = Number(b.state === "CALLED") - Number(a.state === "CALLED");
+  if (activeDifference) return activeDifference;
+  return new Date(b.occurred_at) - new Date(a.occurred_at);
+}
+
+function sortCalls(items) {
+  return [...items].sort(compareCalls).slice(0, 10);
+}
+
 function appointment(call) {
   if (!call.scheduled_at) return "";
   return `<span class="appointment">${formatTime(call.scheduled_at)}</span>`;
@@ -26,7 +36,7 @@ function render() {
 
 function update(call) {
   calls = [call, ...calls.filter(item => item.public_call_code !== call.public_call_code)]
-    .sort((a, b) => new Date(b.occurred_at) - new Date(a.occurred_at))
+    .sort(compareCalls)
     .slice(0, 10);
   render();
 }
@@ -38,7 +48,7 @@ function connect() {
     const message = JSON.parse(event.data);
     if (message.type === "snapshot") {
       if (message.label) label.textContent = message.label;
-      calls = message.calls;
+      calls = sortCalls(message.calls);
       render();
     }
     if (message.type === "call" || message.type === "state") update(message.call);
