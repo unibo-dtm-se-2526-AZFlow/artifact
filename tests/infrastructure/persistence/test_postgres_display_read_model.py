@@ -265,6 +265,46 @@ def test_recent_calls_ordered_by_authoritative_call_time(connection):
     assert [call.public_call_code for call in calls] == ["AAA003", "AAA002", "AAA001"]
 
 
+def test_recent_calls_use_latest_call_per_service_access(connection):
+    """A later call of the same access replaces its earlier call and reorders it."""
+    topology = _Topology(connection)
+    agenda_id = _agenda_id(connection)
+    ticket_master = seed_ticket_master(connection, "AAA")
+
+    first_id, _ = _seed_call(
+        connection,
+        topology.room1,
+        agenda_id,
+        ticket_master.id,
+        _at(9),
+        OPERATIONAL_DAY,
+        "AAA001",
+    )
+    _seed_call(
+        connection,
+        topology.room1,
+        agenda_id,
+        ticket_master.id,
+        _at(10),
+        OPERATIONAL_DAY,
+        "AAA002",
+    )
+    _seed_transition(
+        connection, first_id, "WAITING", _at(10, 30), previous_state="CALLED"
+    )
+    _seed_transition(
+        connection, first_id, "CALLED", _at(11), previous_state="WAITING"
+    )
+
+    calls = PostgresDisplayReadModel(connection, recent_calls_max=10).recent_calls_for_monitor(
+        topology.waiting_room_monitor, OPERATIONAL_DAY
+    )
+
+    assert [call.public_call_code for call in calls] == ["AAA001", "AAA002"]
+    assert [call.occurred_at for call in calls] == [_at(11), _at(10)]
+    assert sum(call.public_call_code == "AAA001" for call in calls) == 1
+
+
 def test_recent_calls_tie_break_by_transition_id_desc(connection):
     """Equal occurred_at is broken by transition id descending."""
     topology = _Topology(connection)

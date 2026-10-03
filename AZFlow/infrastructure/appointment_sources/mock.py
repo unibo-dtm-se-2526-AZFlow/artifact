@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Mapping, Optional
 
 from AZFlow.application.ports.appointment_source import ExternalAppointmentData
@@ -90,8 +90,10 @@ _DEFAULT_APPOINTMENTS: Dict[str, List[ExternalAppointmentData]] = {
 }
 
 
-def _demo_appointments() -> Dict[str, List[ExternalAppointmentData]]:
-    """Build the deterministic not-yet-arrived Patients used by the demo."""
+def _demo_appointments(
+    reference_time: datetime,
+) -> Dict[str, List[ExternalAppointmentData]]:
+    """Build not-yet-arrived demo Patients around the current demo time."""
     result: Dict[str, List[ExternalAppointmentData]] = {}
     multi = {
         41: (2, 4),
@@ -105,13 +107,14 @@ def _demo_appointments() -> Dict[str, List[ExternalAppointmentData]]:
         agenda_ids = multi.get(number, (((number - 31) % 5) + 1,))
         appointments: List[ExternalAppointmentData] = []
         for index, agenda_id in enumerate(agenda_ids):
-            # DEMO031 is deliberately late at mid-morning.
+            # DEMO031 is deliberately two hours late; the others start just
+            # after the demo reference time and remain eight minutes apart.
             minutes = -120 if number == 31 else (number - 31) * 8 + index * 45
-            hour, minute = divmod(10 * 60 + 30 + minutes, 60)
+            scheduled_at = reference_time + timedelta(minutes=minutes)
             appointments.append(
                 ExternalAppointmentData(
                     external_source_code="MOCK",
-                    scheduled_at=datetime(2000, 1, 1, hour, minute),
+                    scheduled_at=scheduled_at,
                     external_agenda_reference=f"AGENDA-{agenda_id}",
                     external_appointment_reference=f"DEMO-APPT-{number:03d}-{index + 1}",
                     external_patient_reference=f"DEMO-PAT-{number:03d}",
@@ -119,9 +122,6 @@ def _demo_appointments() -> Dict[str, List[ExternalAppointmentData]]:
             )
         result[f"DEMO{number:03d}"] = appointments
     return result
-
-
-_DEFAULT_APPOINTMENTS.update(_demo_appointments())
 
 
 class MockAppointmentSource:
@@ -135,7 +135,11 @@ class MockAppointmentSource:
         self,
         appointments: Optional[Mapping[str, List[ExternalAppointmentData]]] = None,
     ) -> None:
-        source = _DEFAULT_APPOINTMENTS if appointments is None else appointments
+        if appointments is None:
+            source = dict(_DEFAULT_APPOINTMENTS)
+            source.update(_demo_appointments(datetime.now()))
+        else:
+            source = dict(appointments)
         # Copy the data to protect it from external changes
         self._appointments: Dict[str, List[ExternalAppointmentData]] = {
             key: list(value) for key, value in source.items()
