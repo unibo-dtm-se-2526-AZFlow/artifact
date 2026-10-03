@@ -1,6 +1,6 @@
 import { queryInt, websocket } from "../shared/azflow-api.js";
 
-const monitor = queryInt("id", 1);
+const monitor = queryInt("id");
 const connection = document.querySelector("#connection");
 const panel = document.querySelector("#call");
 const code = document.querySelector("#code");
@@ -26,6 +26,10 @@ function show(call) {
 }
 
 function connect() {
+  if (!monitor || monitor <= 0) {
+    connection.textContent = "Missing or invalid monitor id";
+    return;
+  }
   const ws = websocket(`/ws/room-monitors/${monitor}`);
   ws.onopen = () => connection.textContent = `Monitor ${monitor} · Live`;
   ws.onmessage = event => {

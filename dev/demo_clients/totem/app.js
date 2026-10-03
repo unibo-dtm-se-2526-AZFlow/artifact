@@ -1,5 +1,5 @@
 import { api, queryInt } from "../shared/azflow-api.js";
-const totemId=queryInt("id", 1);
+const totemId=queryInt("id");
 const formView=document.querySelector("#form-view"), success=document.querySelector("#success-view"), status=document.querySelector("#status"), input=document.querySelector("#identifier");
 document.querySelector("#form").addEventListener("submit", async event => {
   event.preventDefault(); status.textContent="Checking…"; status.classList.remove("error");
@@ -11,6 +11,13 @@ document.querySelector("#form").addEventListener("submit", async event => {
 document.querySelector("#again").addEventListener("click",()=>{success.classList.add("hidden");formView.classList.remove("hidden");status.textContent="";input.value="";input.focus();});
 
 async function validateTotem() {
+  if (!totemId || totemId <= 0) {
+    input.disabled = true;
+    document.querySelector("#form button").disabled = true;
+    status.textContent = "Missing or invalid totem id";
+    status.classList.add("error");
+    return;
+  }
   try {
     await api("/totems/" + totemId);
   } catch (error) {
