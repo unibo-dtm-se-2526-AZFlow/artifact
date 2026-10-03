@@ -65,7 +65,8 @@ class PostgresDisplayReadModel:
                 JOIN room r ON r.id = sa.room_id
                 LEFT JOIN appointment ap ON ap.id = sa.appointment_id
                 LEFT JOIN queue q ON q.id = lc.queue_id
-                ORDER BY lc.occurred_at DESC, lc.id DESC
+                ORDER BY CASE WHEN sa.state = 'CALLED' THEN 0 ELSE 1 END,
+                         lc.occurred_at DESC, lc.id DESC
                 LIMIT %(max_size)s
                 """,
                 {
