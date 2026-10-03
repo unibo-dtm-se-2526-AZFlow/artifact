@@ -14,6 +14,8 @@ class OperatorRoom:
     id: int
     room_reference: str
     label: str
+    active_service_access_id: int | None = None
+    active_public_call_code: str | None = None
 
 
 @dataclass(frozen=True)

@@ -23,16 +23,32 @@ class PostgresOperatorDiscoveryReadModel:
         with self._conn.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT id, room_reference, label
-                FROM room
-                ORDER BY label, id
+                SELECT r.id, r.room_reference, r.label,
+                       sa.id, dp.public_call_code
+                FROM room r
+                LEFT JOIN LATERAL (
+                    SELECT candidate.id, candidate.daily_presence_id
+                    FROM service_access candidate
+                    WHERE candidate.room_id = r.id
+                      AND candidate.state = 'CALLED'
+                    ORDER BY candidate.id DESC
+                    LIMIT 1
+                ) sa ON TRUE
+                LEFT JOIN daily_presence dp ON dp.id = sa.daily_presence_id
+                ORDER BY r.label, r.id
                 """
             )
             rows = cursor.fetchall()
 
         return [
-            OperatorRoom(id=room_id, room_reference=reference, label=label)
-            for room_id, reference, label in rows
+            OperatorRoom(
+                id=room_id,
+                room_reference=reference,
+                label=label,
+                active_service_access_id=active_service_access_id,
+                active_public_call_code=active_public_call_code,
+            )
+            for room_id, reference, label, active_service_access_id, active_public_call_code in rows
         ]
 
     def list_queues(self) -> List[OperatorQueue]:

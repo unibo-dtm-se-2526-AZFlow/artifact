@@ -6,7 +6,9 @@ const entries = document.querySelector("#entries");
 const status = document.querySelector("#status");
 const policy = document.querySelector("#policy");
 const calledCard = document.querySelector("#called-card");
+const nextButton = document.querySelector("#next");
 let currentCall = null;
+let discoveredRooms = [];
 
 function setStatus(message = "", error = false) {
   status.textContent = message;
@@ -19,19 +21,42 @@ function selectedRoom() {
 
 async function loadDiscovery() {
   const [rooms, queues] = await Promise.all([api("/rooms"), api("/queues")]);
+  discoveredRooms = rooms;
   room.innerHTML = rooms.map(r => `<option value="${r.id}" data-reference="${r.room_reference}">${r.label}</option>`).join("");
   queue.innerHTML = queues.filter(q => q.status === "ACTIVE").map(q => `<option value="${q.id}">Queue ${q.id} · ${q.agendas.map(a => a.name).join(", ")}</option>`).join("");
   const roomId = queryInt("room");
   const queueId = queryInt("queue");
   if (roomId) room.value = String(roomId);
   if (queueId) queue.value = String(queueId);
+  syncCurrentCall();
+}
+
+function syncCurrentCall() {
+  const selected = discoveredRooms.find(r => String(r.id) === room.value);
+  if (selected?.active_service_access_id) {
+    currentCall = {
+      service_access_id: selected.active_service_access_id,
+      public_call_code: selected.active_public_call_code,
+      room_reference: selected.room_reference,
+    };
+    document.querySelector("#called-code").textContent = currentCall.public_call_code;
+    document.querySelector("#called-room").textContent = currentCall.room_reference;
+    calledCard.classList.remove("hidden");
+  } else {
+    currentCall = null;
+    calledCard.classList.add("hidden");
+  }
+}
+
+function callDisabled() {
+  return currentCall ? " disabled" : "";
 }
 
 function actions(entry) {
-  if (entry.state === "WAITING") return `<button data-action="call" data-id="${entry.service_access_id}">Call</button><button class="secondary" data-action="suspend" data-id="${entry.service_access_id}">Suspend</button>`;
-  if (entry.state === "SUSPENDED") return `<button data-action="call" data-id="${entry.service_access_id}">Call</button><button class="secondary" data-action="restore" data-id="${entry.service_access_id}">Restore</button>`;
+  if (entry.state === "WAITING") return `<button data-action="call" data-id="${entry.service_access_id}"${callDisabled()}>Call</button><button class="secondary" data-action="suspend" data-id="${entry.service_access_id}">Suspend</button>`;
+  if (entry.state === "SUSPENDED") return `<button data-action="call" data-id="${entry.service_access_id}"${callDisabled()}>Call</button><button class="secondary" data-action="restore" data-id="${entry.service_access_id}">Restore</button>`;
   if (entry.state === "CALLED") return `<button class="secondary" data-action="cancel-call" data-id="${entry.service_access_id}">Cancel</button><button data-action="admission" data-id="${entry.service_access_id}">Admit</button>`;
-  if (entry.state === "ADMITTED") return `<button data-action="recall" data-id="${entry.service_access_id}">Recall</button>`;
+  if (entry.state === "ADMITTED") return `<button data-action="recall" data-id="${entry.service_access_id}"${callDisabled()}>Recall</button>`;
   return "";
 }
 
@@ -51,11 +76,20 @@ function lastEvent(entry) {
   return `<span class="last-event"><strong>${formatTime(entry.last_event_at)}</strong><small>${label}</small></span>`;
 }
 
+async function refreshRoomState() {
+  discoveredRooms = await api("/rooms");
+  syncCurrentCall();
+}
+
 async function refresh() {
   if (!queue.value) return;
   try {
-    const data = await api(`/queues/${queue.value}/operator-list`);
+    const [data] = await Promise.all([
+      api(`/queues/${queue.value}/operator-list`),
+      refreshRoomState(),
+    ]);
     policy.textContent = data.policy;
+    nextButton.disabled = Boolean(currentCall);
     entries.innerHTML = data.entries.map(e => `<tr class="state-${e.state.toLowerCase()}"><td><strong>${e.public_call_code}</strong></td><td>${e.agenda.name}</td><td><span class="badge">${e.state}</span></td><td>${formatTime(e.checked_in_at)}</td><td>${appointment(e, data.policy)}</td><td>${lastEvent(e)}</td><td><div class="row-actions">${actions(e)}</div></td></tr>`).join("");
     if (!data.entries.length) entries.innerHTML = '<tr><td colspan="6" class="muted">No patients for this queue today.</td></tr>';
     setStatus(`Queue updated at ${new Date().toLocaleTimeString()}`);
@@ -65,6 +99,7 @@ async function refresh() {
 async function call(path) {
   const result = await api(path, {method:"POST", body:JSON.stringify({room_reference:selectedRoom()})});
   currentCall = result;
+  nextButton.disabled = true;
   document.querySelector("#called-code").textContent = result.public_call_code;
   document.querySelector("#called-room").textContent = result.room_reference;
   calledCard.classList.remove("hidden");
@@ -85,6 +120,7 @@ entries.addEventListener("click", async event => {
       if (button.dataset.action === "recall") {
         const result = await api(`/service-accesses/${id}/recall`, {method:"POST"});
         currentCall = result;
+        nextButton.disabled = true;
         document.querySelector("#called-code").textContent = result.public_call_code;
         document.querySelector("#called-room").textContent = result.room_reference;
         calledCard.classList.remove("hidden");
@@ -94,6 +130,7 @@ entries.addEventListener("click", async event => {
       await api(`/service-accesses/${id}/${button.dataset.action}`, {method:"POST"});
       if (["admission", "cancel-call"].includes(button.dataset.action) && currentCall?.service_access_id === Number(id)) {
         currentCall = null;
+        nextButton.disabled = false;
         calledCard.classList.add("hidden");
       }
       await refresh();
@@ -104,16 +141,17 @@ document.querySelector("#cancel-call").addEventListener("click", async () => {
   if (!currentCall) return;
   try {
     await api(`/service-accesses/${currentCall.service_access_id}/cancel-call`, {method:"POST"});
-    currentCall = null; calledCard.classList.add("hidden"); await refresh();
+    currentCall = null; nextButton.disabled = false; calledCard.classList.add("hidden"); await refresh();
   } catch (error) { setStatus(error.message, true); }
 });
 document.querySelector("#admit").addEventListener("click", async () => {
   if (!currentCall) return;
   try {
     await api(`/service-accesses/${currentCall.service_access_id}/admission`, {method:"POST"});
-    currentCall = null; calledCard.classList.add("hidden"); await refresh();
+    currentCall = null; nextButton.disabled = false; calledCard.classList.add("hidden"); await refresh();
   } catch (error) { setStatus(error.message, true); }
 });
+room.addEventListener("change", () => { syncCurrentCall(); refresh(); });
 queue.addEventListener("change", refresh);
 
 try { await loadDiscovery(); await refresh(); } catch (error) { setStatus(error.message, true); }
