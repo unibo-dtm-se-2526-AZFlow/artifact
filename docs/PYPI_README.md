@@ -1,106 +1,78 @@
 # AZFlow
 
-AZFlow is a healthcare queue management system for outpatient environments.
-
-It manages the operational patient flow from check-in to queue handling,
-patient calling and access to the healthcare service. AZFlow exposes a FastAPI
-HTTP API and uses PostgreSQL for persistence.
+AZFlow is a healthcare queue-management backend for outpatient workflows. It
+covers patient check-in, operational Queues, calling, state transitions and
+public call displays through a FastAPI API backed by PostgreSQL.
 
 ## Requirements
 
 - Python 3.10 or newer
 - PostgreSQL
 
-AZFlow does not install or manage PostgreSQL. A PostgreSQL database must be
-available before the first start.
-
 ## Installation
 
-Install AZFlow from PyPI:
+The course release is published on TestPyPI:
 
-~~~bash
-pip install AZFlow
-~~~
+```bash
+pip install \
+  --index-url https://test.pypi.org/simple/ \
+  --extra-index-url https://pypi.org/simple/ \
+  AZFlow
+```
 
 ## Configuration
 
-AZFlow reads its configuration from environment variables. A `.env` file in
-the current working directory is also supported.
+AZFlow reads configuration from environment variables and also supports a
+`.env` file in the current working directory.
 
-A minimal configuration is:
+Minimal PostgreSQL configuration:
 
-~~~dotenv
+```dotenv
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_USER=azflow
 POSTGRES_PASSWORD=change-me
 POSTGRES_DB=azflow
-~~~
+```
 
-The PostgreSQL connection URL is built internally from these values.
+Optional API binding:
 
-The API binding can optionally be configured with:
-
-~~~dotenv
+```dotenv
 AZFLOW_API_HOST=0.0.0.0
 AZFLOW_API_PORT=8000
-~~~
+```
 
-## Database setup
+## Database and startup
 
-AZFlow ships with its database migrations.
+Apply the bundled Alembic migrations before the first start and after upgrading
+AZFlow:
 
-Before the first start, apply all migrations to the configured PostgreSQL
-database:
-
-~~~bash
+```bash
 python -m AZFlow.migrations upgrade
-~~~
+```
 
-The same command should be run before starting a newly installed AZFlow
-version. Only pending migrations are applied.
+Then start the application:
 
-Database migrations are intentionally not executed automatically when AZFlow
-starts.
-
-## Start AZFlow
-
-Start the application with:
-
-~~~bash
+```bash
 python -m AZFlow
-~~~
+```
 
-With the default configuration, the API is available at:
+With the default configuration, the API is available at
+`http://localhost:8000` and the interactive OpenAPI documentation at
+`http://localhost:8000/docs`.
 
-~~~text
-http://localhost:8000
-~~~
+Database migrations are deliberately explicit and are not applied silently at
+application startup.
 
-The interactive API documentation is available at:
+## Project resources
 
-~~~text
-http://localhost:8000/docs
-~~~
+The published package contains the AZFlow application and database migrations.
+Tests, Docker Compose configuration, development tools, demo clients and seed
+data remain in the source repository.
 
-## Development
+- Source repository: https://github.com/unibo-dtm-se-2526-AZFlow/artifact
+- Project documentation: https://unibo-dtm-se-2526-azflow.github.io/report/
 
-The PyPI package contains the AZFlow application and the database migrations
-required to run it.
-
-Development tools, tests, Docker Compose configuration, demo browser clients
-and demo seed data are kept in the source repository and are not included in
-the production package.
-
-## Project
-
-AZFlow is developed as part of the Software Engineering course of the Digital
-Transformation Management programme at the University of Bologna.
-
-The project follows a hexagonal architecture. Business logic is kept separate
-from HTTP, database and external-system adapters so that integrations can
-evolve without changing the core domain model.
-
-## License
-
-AZFlow is distributed under the Apache License 2.0.
+AZFlow is a Software Engineering project for the Digital Transformation
+Management programme at the University of Bologna and is distributed under the
+Apache License 2.0.
