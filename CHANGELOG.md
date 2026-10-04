@@ -1,3 +1,39 @@
+## [2.0.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v1.2.0...v2.0.0) (2026-10-04)
+
+### ⚠ BREAKING CHANGES
+
+* **check-in:** check-in requests now use `totem_id` instead of `totem_reference`.
+
+### Bug Fixes
+
+* **demo:** fail closed on missing device ids ([3911cf9](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/3911cf954504bf78686f39c33aaa549ea1114645))
+* **demo:** keep active calls in distinct rooms ([40f26f3](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/40f26f3d070ee0b15f6bb07cfee2f6157123bdc9))
+* **demo:** make seed times relative to startup ([aaa3613](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/aaa361366cb8193a3392c1d6ff6f13ed340e46ec))
+* **demo:** validate totem configuration ([e933009](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/e933009887d985c1954d760c50224d9a5e0ebafc))
+* **dev:** use local timezone for PostgreSQL ([e77fd27](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/e77fd279f696210f4a6fa0ff3cc0798007ce36e7))
+* **display:** prioritize active waiting-room calls ([71bdf7d](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/71bdf7dbced5b22ea40c996d707686ee1eb56ec3))
+* **display:** respect queue policy for appointment time ([5b1378c](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/5b1378c3f8e74a5367523e421505f1d678e2e1b4))
+* **operator:** restore active room call state ([7c64acc](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/7c64acc73a3cb02a094818ec925ecaeeb44f7223))
+
+### Documentation
+
+* **readme:** expand development and demo setup ([5bbfaa8](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/5bbfaa8e2eb84814023d0faf2a3728b1e4a62adf))
+
+### Tests
+
+* **display:** cover latest call ordering ([cbfcc38](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/cbfcc389e6941ce38e6bad1b8723676e605bcb48))
+
+### Style improvements
+
+* **tests:** format operator discovery test ([3338892](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/33388922c132a1fd6f9f6721c03f4a24073238db))
+
+### Refactoring
+
+* **check-in:** identify totems by id ([9f1574c](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/9f1574caec4d9c286da46597e7626e6b9a33ba9b))
+* **demo:** align device clients on id parameter ([a8b3fde](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/a8b3fde65fdf778ff52f95ac2acb8c450ea47ad8))
+* **events:** remove unused publisher fan-out ([bac849a](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/bac849ac25b489718be8e6dc52715ae00cec288e))
+* **tests:** move transition record to test support ([ed7ab86](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/ed7ab863558fdf5e067e2bf8777f91edb4ccc798))
+
 ## [1.2.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v1.1.0...v1.2.0) (2026-09-26)
 
 ### Features
