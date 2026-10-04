@@ -21,6 +21,8 @@ class OperatorRoomModel(BaseModel):
     id: int
     room_reference: str
     label: str
+    active_service_access_id: int | None = None
+    active_public_call_code: str | None = None
 
 
 class OperatorQueueModel(BaseModel):
@@ -47,6 +49,8 @@ def list_rooms(
             id=room.id,
             room_reference=room.room_reference,
             label=room.label,
+            active_service_access_id=room.active_service_access_id,
+            active_public_call_code=room.active_public_call_code,
         )
         for room in read_model.list_rooms()
     ]

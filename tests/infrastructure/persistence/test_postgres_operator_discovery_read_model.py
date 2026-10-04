@@ -44,6 +44,48 @@ def test_list_rooms_returns_selector_data_in_display_order(connection):
     ]
 
 
+def test_list_rooms_reports_active_call_for_each_room(connection):
+    room_a = _seed_room(connection, "ROOM-A", "Room A")
+    room_b = _seed_room(connection, "ROOM-B", "Room B")
+    ticket_master = seed_ticket_master(connection, "AAA")
+    source = seed_source(connection)
+    agenda = seed_external_agenda(
+        connection, source, "Cardiology", "AGENDA-A"
+    ).agenda
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO daily_presence (
+                operational_day, patient_identifier_type, patient_identifier_value,
+                public_call_code, ticket_master_id
+            )
+            VALUES (CURRENT_DATE, 'fiscal_code', 'PATIENT-A', 'AAA001', %s)
+            RETURNING id
+            """,
+            (ticket_master.id,),
+        )
+        daily_presence_id = cursor.fetchone()[0]
+        cursor.execute(
+            """
+            INSERT INTO service_access (daily_presence_id, agenda_id, state, room_id)
+            VALUES (%s, %s, 'CALLED', %s)
+            RETURNING id
+            """,
+            (daily_presence_id, agenda.id, room_a),
+        )
+        service_access_id = cursor.fetchone()[0]
+    connection.commit()
+
+    rooms = PostgresOperatorDiscoveryReadModel(connection).list_rooms()
+    by_id = {room.id: room for room in rooms}
+
+    assert by_id[room_a].active_service_access_id == service_access_id
+    assert by_id[room_a].active_public_call_code == "AAA001"
+    assert by_id[room_b].active_service_access_id is None
+    assert by_id[room_b].active_public_call_code is None
+
+
 def test_list_queues_returns_all_queues_with_agendas(connection):
     source = seed_source(connection)
     agenda_a = seed_external_agenda(connection, source, "Cardiology", "AGENDA-A").agenda
