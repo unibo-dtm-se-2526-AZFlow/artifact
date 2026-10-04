@@ -121,18 +121,11 @@ class PostgresCheckInRepository:
             active_queues=active_queues,
         )
 
-    def resolve_totem(self, totem_reference: str) -> Optional[int]:
-        """Return the configured Totem id for a reference, or None when unknown"""
+    def totem_exists(self, totem_id: int) -> bool:
+        """Return whether the Totem id is configured"""
         with self._conn.cursor() as cursor:
-            cursor.execute(
-                "SELECT id FROM totem WHERE external_reference = %s",
-                (totem_reference,),
-            )
-            row = cursor.fetchone()
-        if row is None:
-            return None
-        totem_id: int = row[0]
-        return totem_id
+            cursor.execute("SELECT 1 FROM totem WHERE id = %s", (totem_id,))
+            return cursor.fetchone() is not None
 
     def find_or_create_appointment(
         self,

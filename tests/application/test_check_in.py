@@ -5,7 +5,7 @@ import pytest
 
 from AZFlow.application.check_in import CheckInService
 from AZFlow.application.errors import (
-    InvalidTotemReferenceError,
+    InvalidTotemIdError,
     NoAppointmentAvailableError,
     UnsupportedIdentifierTypeError,
 )
@@ -222,21 +222,20 @@ def test_operational_day_defaults_to_today(monkeypatch):
 # Task 5.2 - optional Totem origin and initial WAITING history.
 # Property 2, Validates: Requirements 1.2, 1.3, 1.12, 3.2, 3.3, 3.4, 3.5, 3.6
 
-_TOTEM_REFERENCE = "TOTEM-1"
 _TOTEM_ID = 42
 
 
 def _service_with_totems(
     resolutions: Dict[Tuple[str, str], ResolvedAgenda],
     appointments: List[ExternalAppointmentData],
-    totems: Dict[str, int],
+    totems: Dict[int, int],
 ) -> Tuple[CheckInService, FakeCheckInRepository]:
     repository = FakeCheckInRepository(resolutions, totems)
     source = ListAppointmentSource(appointments)
     return CheckInService([source], repository), repository
 
 
-def test_valid_totem_reference_persists_origin_on_new_presence():
+def test_valid_totem_id_persists_origin_on_new_presence():
     # Validates: Requirements 3.2, 3.4 - a known Totem origin is persisted.
     ticket_master = TicketMaster(id=1, prefix="AAA")
     resolutions = {
@@ -244,12 +243,10 @@ def test_valid_totem_reference_persists_origin_on_new_presence():
     }
     appointments = [_data("AGENDA-A", "APPT-1", 9)]
     service, repository = _service_with_totems(
-        resolutions, appointments, {_TOTEM_REFERENCE: _TOTEM_ID}
+        resolutions, appointments, {_TOTEM_ID: _TOTEM_ID}
     )
 
-    result = service.check_in(
-        _IDENTIFIER, totem_reference=_TOTEM_REFERENCE, operational_day=_DAY
-    )
+    result = service.check_in(_IDENTIFIER, totem_id=_TOTEM_ID, operational_day=_DAY)
 
     assert result.public_call_code == "AAA001"
     assert repository.created_daily_presences == 1
@@ -257,7 +254,7 @@ def test_valid_totem_reference_persists_origin_on_new_presence():
     assert repository.persisted_totem_ids == [_TOTEM_ID]
 
 
-def test_unknown_totem_reference_raises_and_creates_nothing():
+def test_unknown_totem_id_raises_and_creates_nothing():
     # Validates: Requirements 3.3 - resolution happens before any data creation.
     ticket_master = TicketMaster(id=1, prefix="AAA")
     resolutions = {
@@ -265,13 +262,13 @@ def test_unknown_totem_reference_raises_and_creates_nothing():
     }
     appointments = [_data("AGENDA-A", "APPT-1", 9)]
     service, repository = _service_with_totems(
-        resolutions, appointments, {_TOTEM_REFERENCE: _TOTEM_ID}
+        resolutions, appointments, {_TOTEM_ID: _TOTEM_ID}
     )
 
-    with pytest.raises(InvalidTotemReferenceError) as info:
-        service.check_in(_IDENTIFIER, totem_reference="UNKNOWN", operational_day=_DAY)
+    with pytest.raises(InvalidTotemIdError) as info:
+        service.check_in(_IDENTIFIER, totem_id=999, operational_day=_DAY)
 
-    assert info.value.totem_reference == "UNKNOWN"
+    assert info.value.totem_id == 999
     # No appointment, presence or service access was created.
     assert repository.created_daily_presences == 0
     assert repository.created_service_accesses == 0
@@ -279,7 +276,7 @@ def test_unknown_totem_reference_raises_and_creates_nothing():
     assert repository.persisted_totem_ids == []
 
 
-def test_no_totem_reference_leaves_origin_unknown():
+def test_no_totem_id_leaves_origin_unknown():
     # Validates: Requirements 3.5, 3.6 - omitting the Totem behaves as before.
     ticket_master = TicketMaster(id=1, prefix="AAA")
     resolutions = {
@@ -292,7 +289,7 @@ def test_no_totem_reference_leaves_origin_unknown():
 
     assert result.public_call_code == "AAA001"
     assert repository.created_daily_presences == 1
-    # The origin stays unknown when no Totem reference is supplied.
+    # The origin stays unknown when no Totem id is supplied.
     assert repository.persisted_totem_ids == [None]
 
 

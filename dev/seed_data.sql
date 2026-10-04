@@ -1,4 +1,4 @@
--- Development/demo data for the AZFlow 1.1 mid-morning scenario
+-- Development/demo data for the AZFlow 1.1 in-progress-day scenario
 -- The matching not-yet-arrived appointments live in MockAppointmentSource.
 
 BEGIN;
@@ -89,8 +89,9 @@ INSERT INTO waiting_room_monitor_scope (
     (3, 3),
     (4, 1);
 
--- Mid-morning context: 30 Patients have already checked in.
--- Their appointment times are deterministic and spread across all five Agendas.
+-- In-progress-day context: 30 Patients have already checked in.
+-- Times are relative to seed execution so the snapshot is valid at any hour.
+-- Appointments are spread across all five Agendas.
 INSERT INTO appointment (
     id, scheduled_at, patient_identifier_type, patient_identifier_value,
     external_agenda_id, external_patient_reference,
@@ -98,7 +99,7 @@ INSERT INTO appointment (
 )
 SELECT
     n,
-    CURRENT_DATE + TIME '08:00' + n * INTERVAL '7 minutes',
+    CURRENT_TIMESTAMP - INTERVAL '3 hours' + n * INTERVAL '7 minutes',
     'fiscal_code',
     'SEED' || LPAD(n::text, 3, '0'),
     ((n - 1) % 5) + 1,
@@ -136,7 +137,12 @@ SELECT
         ELSE 'WAITING'
     END,
     CASE
+        -- Keep the three active calls on distinct Rooms. Historical ADMITTED
+        -- accesses may share Rooms because they are no longer current calls.
         WHEN n > 20 THEN NULL
+        WHEN n = 18 THEN 1
+        WHEN n = 19 THEN 2
+        WHEN n = 20 THEN 3
         WHEN ((n - 1) % 5) + 1 = 1 THEN 1
         WHEN ((n - 1) % 5) + 1 = 2 THEN 2
         ELSE 3
@@ -145,13 +151,14 @@ FROM generate_series(1, 30) AS n;
 
 -- Every previously called Patient has a WAITING -> CALLED history record.
 INSERT INTO service_access_transition (
-    service_access_id, previous_state, resulting_state, occurred_at
+    service_access_id, previous_state, resulting_state, occurred_at, queue_id
 )
 SELECT
     n,
     'WAITING',
     'CALLED',
-    CURRENT_DATE + TIME '08:25' + n * INTERVAL '4 minutes'
+    CURRENT_TIMESTAMP - INTERVAL '100 minutes' + n * INTERVAL '4 minutes',
+    ((n - 1) % 5) + 1
 FROM generate_series(1, 20) AS n;
 
 -- The first 17 have also entered their Room.
@@ -162,7 +169,7 @@ SELECT
     n,
     'CALLED',
     'ADMITTED',
-    CURRENT_DATE + TIME '08:35' + n * INTERVAL '4 minutes'
+    CURRENT_TIMESTAMP - INTERVAL '90 minutes' + n * INTERVAL '4 minutes'
 FROM generate_series(1, 17) AS n;
 
 -- All ticket masters start above the seeded suffixes. Gaps are harmless in demo data.

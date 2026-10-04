@@ -54,11 +54,10 @@ def _service_with_appointment() -> CheckInService:
     return CheckInService([source], repository)
 
 
-def _service_with_totem(known_totems: dict[str, int]) -> CheckInService:
+def _service_with_totem(known_totems: dict[int, int]) -> CheckInService:
     """A CheckInService that succeeds with one appointment and knows some Totems.
 
-    The repository resolves only the configured Totem references; any other
-    reference resolves to None and check-in rejects it.
+    The repository accepts only configured Totem ids; check-in rejects any other id.
     """
     resolutions = {(_SOURCE_CODE, _AGENDA_REFERENCE): _resolution()}
     repository = FakeCheckInRepository(resolutions, known_totems)
@@ -170,15 +169,33 @@ def test_public_call_code_does_not_contain_submitted_identifier(client):
 # 10.1-10.4: no response exposes the Patient Identifier).
 
 
-def test_check_in_with_valid_totem_reference_succeeds(client):
-    _override(_service_with_totem({"TOTEM-1": 1}))
+def test_totem_validation_accepts_configured_id(client):
+    _override(_service_with_totem({1: 1}))
+
+    response = client.get("/api/v1/totems/1")
+
+    assert response.status_code == 200
+    assert response.json() is None
+
+
+def test_totem_validation_rejects_unknown_id(client):
+    _override(_service_with_totem({1: 1}))
+
+    response = client.get("/api/v1/totems/2")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Totem id is not configured"}
+
+
+def test_check_in_with_valid_totem_id_succeeds(client):
+    _override(_service_with_totem({1: 1}))
 
     response = client.post(
         "/api/v1/check-ins",
         json={
             "identifier_type": FISCAL_CODE,
             "identifier_value": _KNOWN_VALUE,
-            "totem_reference": "TOTEM-1",
+            "totem_id": 1,
         },
     )
 
@@ -190,8 +207,8 @@ def test_check_in_with_valid_totem_reference_succeeds(client):
     assert _KNOWN_VALUE not in response.text
 
 
-def test_check_in_with_unknown_totem_reference_returns_400(client):
-    # The repository knows no matching Totem, so the reference is unknown.
+def test_check_in_with_unknown_totem_id_returns_400(client):
+    # The repository knows no matching Totem, so the id is unknown.
     _override(_service_with_totem({}))
 
     response = client.post(
@@ -199,7 +216,7 @@ def test_check_in_with_unknown_totem_reference_returns_400(client):
         json={
             "identifier_type": FISCAL_CODE,
             "identifier_value": _KNOWN_VALUE,
-            "totem_reference": "UNKNOWN",
+            "totem_id": 999,
         },
     )
 
@@ -211,7 +228,7 @@ def test_check_in_with_unknown_totem_reference_returns_400(client):
     assert _KNOWN_VALUE not in response.text
 
 
-def test_check_in_without_totem_reference_behaves_as_before(client):
+def test_check_in_without_totem_id_behaves_as_before(client):
     _override(_service_with_appointment())
 
     response = client.post(

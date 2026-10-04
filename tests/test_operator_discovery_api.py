@@ -52,8 +52,20 @@ def test_list_rooms_exposes_operator_room_selector_data(client):
 
     assert response.status_code == 200
     assert response.json() == [
-        {"id": 2, "room_reference": "ROOM-2", "label": "Room 2"},
-        {"id": 11, "room_reference": "ROOM-11", "label": "Room 11"},
+        {
+            "id": 2,
+            "room_reference": "ROOM-2",
+            "label": "Room 2",
+            "active_service_access_id": None,
+            "active_public_call_code": None,
+        },
+        {
+            "id": 11,
+            "room_reference": "ROOM-11",
+            "label": "Room 11",
+            "active_service_access_id": None,
+            "active_public_call_code": None,
+        },
     ]
 
 

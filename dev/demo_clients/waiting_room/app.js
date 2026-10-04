@@ -1,10 +1,20 @@
 import { formatTime, queryInt, websocket } from "../shared/azflow-api.js";
 
-const monitor = queryInt("monitor", 1);
+const monitor = queryInt("id");
 const connection = document.querySelector("#connection");
 const container = document.querySelector("#calls");
 const label = document.querySelector("#waiting-room-label");
 let calls = [];
+
+function compareCalls(a, b) {
+  const activeDifference = Number(b.state === "CALLED") - Number(a.state === "CALLED");
+  if (activeDifference) return activeDifference;
+  return new Date(b.occurred_at) - new Date(a.occurred_at);
+}
+
+function sortCalls(items) {
+  return [...items].sort(compareCalls).slice(0, 10);
+}
 
 function appointment(call) {
   if (!call.scheduled_at) return "";
@@ -26,19 +36,23 @@ function render() {
 
 function update(call) {
   calls = [call, ...calls.filter(item => item.public_call_code !== call.public_call_code)]
-    .sort((a, b) => new Date(b.occurred_at) - new Date(a.occurred_at))
+    .sort(compareCalls)
     .slice(0, 10);
   render();
 }
 
 function connect() {
+  if (!monitor || monitor <= 0) {
+    connection.textContent = "Missing or invalid monitor id";
+    return;
+  }
   const ws = websocket(`/ws/waiting-room-monitors/${monitor}`);
   ws.onopen = () => connection.textContent = `Monitor ${monitor} · Live`;
   ws.onmessage = event => {
     const message = JSON.parse(event.data);
     if (message.type === "snapshot") {
       if (message.label) label.textContent = message.label;
-      calls = message.calls;
+      calls = sortCalls(message.calls);
       render();
     }
     if (message.type === "call" || message.type === "state") update(message.call);

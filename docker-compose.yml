@@ -37,6 +37,7 @@ services:
 
   postgres:
     image: postgres:16
+    command: ["postgres", "-c", "timezone=Europe/Rome"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-azflow}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-azflow}

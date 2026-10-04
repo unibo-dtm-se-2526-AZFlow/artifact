@@ -11,7 +11,7 @@ from datetime import date
 from typing import List, Optional, Sequence, Tuple
 
 from AZFlow.application.errors import (
-    InvalidTotemReferenceError,
+    InvalidTotemIdError,
     NoAppointmentAvailableError,
     UnsupportedIdentifierTypeError,
 )
@@ -64,19 +64,19 @@ class CheckInService:
         self,
         patient_identifier: PatientIdentifier,
         operational_day: Optional[date] = None,
-        totem_reference: Optional[str] = None,
+        totem_id: Optional[int] = None,
     ) -> CheckInResult:
         """Check in a patient for an operational day
 
         ``operational_day`` stays the second positional parameter to preserve
         the original contract, so existing positional callers are unaffected.
         The current day is used when it is not provided. When
-        ``totem_reference`` is given, it records the check-in origin; the origin
+        ``totem_id`` is given, it records the check-in origin; the origin
         stays unknown otherwise.
 
         Raises:
             UnsupportedIdentifierTypeError: the identifier type is not supported
-            InvalidTotemReferenceError: the Totem reference is unknown
+            InvalidTotemIdError: the Totem id is unknown
             NoAppointmentAvailableError: no valid appointment is available
         """
         self._require_supported_type(patient_identifier)
@@ -84,7 +84,7 @@ class CheckInService:
         day = date.today() if operational_day is None else operational_day
 
         # Reject an unknown Totem before creating any check-in data
-        totem_id = self._resolve_totem(totem_reference)
+        self._require_totem(totem_id)
 
         relevant = self._collect_relevant(patient_identifier, day)
         if not relevant:
@@ -118,14 +118,14 @@ class CheckInService:
 
         return CheckInResult(daily_presence=daily_presence)
 
-    def _resolve_totem(self, totem_reference: Optional[str]) -> Optional[int]:
-        """Resolve the optional check-in origin, rejecting an unknown Totem"""
-        if totem_reference is None:
-            return None
-        totem_id = self._repository.resolve_totem(totem_reference)
-        if totem_id is None:
-            raise InvalidTotemReferenceError(totem_reference)
-        return totem_id
+    def validate_totem(self, totem_id: int) -> None:
+        """Reject a Totem id that is not configured."""
+        self._require_totem(totem_id)
+
+    def _require_totem(self, totem_id: Optional[int]) -> None:
+        """Reject an unknown Totem before creating any check-in data"""
+        if totem_id is not None and not self._repository.totem_exists(totem_id):
+            raise InvalidTotemIdError(totem_id)
 
     @staticmethod
     def _require_supported_type(patient_identifier: PatientIdentifier) -> None:

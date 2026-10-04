@@ -49,16 +49,18 @@ class PostgresCallRepository:
             return None
         return row[0]
 
-    def try_call(self, service_access_id: int, room_id: int) -> Optional[ServiceAccess]:
-        return self._try_call_from(service_access_id, room_id, "WAITING")
+    def try_call(
+        self, service_access_id: int, room_id: int, queue_id: int
+    ) -> Optional[ServiceAccess]:
+        return self._try_call_from(service_access_id, room_id, queue_id, "WAITING")
 
     def try_call_suspended(
-        self, service_access_id: int, room_id: int
+        self, service_access_id: int, room_id: int, queue_id: int
     ) -> Optional[ServiceAccess]:
-        return self._try_call_from(service_access_id, room_id, "SUSPENDED")
+        return self._try_call_from(service_access_id, room_id, queue_id, "SUSPENDED")
 
     def _try_call_from(
-        self, service_access_id: int, room_id: int, previous_state: str
+        self, service_access_id: int, room_id: int, queue_id: int, previous_state: str
     ) -> Optional[ServiceAccess]:
         """Try the WAITING to CALLED transition of one ServiceAccess.
 
@@ -88,10 +90,10 @@ class PostgresCallRepository:
                 cursor.execute(
                     """
                     INSERT INTO service_access_transition
-                        (service_access_id, previous_state, resulting_state)
-                    VALUES (%s, %s, 'CALLED')
+                        (service_access_id, previous_state, resulting_state, queue_id)
+                    VALUES (%s, %s, 'CALLED', %s)
                     """,
-                    (access_id, previous_state),
+                    (access_id, previous_state, queue_id),
                 )
                 daily_presence = load_daily_presence(cursor, daily_presence_id)
                 agenda = load_agenda(cursor, agenda_id)
