@@ -49,9 +49,7 @@ def test_list_rooms_reports_active_call_for_each_room(connection):
     room_b = _seed_room(connection, "ROOM-B", "Room B")
     ticket_master = seed_ticket_master(connection, "AAA")
     source = seed_source(connection)
-    agenda = seed_external_agenda(
-        connection, source, "Cardiology", "AGENDA-A"
-    ).agenda
+    agenda = seed_external_agenda(connection, source, "Cardiology", "AGENDA-A").agenda
 
     with connection.cursor() as cursor:
         cursor.execute(
