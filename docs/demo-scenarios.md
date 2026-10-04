@@ -1,283 +1,189 @@
-# AZFlow 1.2 demo scenarios
+# AZFlow demo walkthrough
 
-This document defines the deterministic development demo and the behaviours
-exposed by the browser demo clients. It follows the current domain model.
+This document is a short, repeatable walkthrough for demonstrating the current
+AZFlow vertical slice. It is not an acceptance-test report: the automated test
+suite remains the validation evidence for the project.
 
-## Operator UI assumptions
+The walkthrough is intentionally small. A fresh demo can cover the important
+behaviours in a few minutes instead of executing a catalogue of isolated cases.
 
-There is no login in 1.2. Authentication and per-user Queue visibility are future work.
+## Prepare the demo
 
-The operator selects:
-- a Room, remembered only by the browser for convenience;
-- a Queue, selected for the current work.
+Reset the deterministic dataset, then start AZFlow:
 
-The compact operator panel offers NEXT and LIST. LIST expands the panel.
-Room and Queue selections are client state and are not persisted by AZFlow.
+```bash
+poetry run poe dev-reset
+poetry run poe dev
+```
 
-The UI uses Queue terminology. Agendas are healthcare schedules imported from
-external systems; a Queue is the operational grouping used for calling.
+Useful browser clients are documented in the project README. The main ones are:
 
-## Demo clients
+- Totem: `http://localhost/demo/totem/?id=1`
+- Operator: `http://localhost/demo/operator/?room=1&queue=1`
+- Waiting Room 1: `http://localhost/demo/waiting_room/?id=1`
+- Waiting Room 2: `http://localhost/demo/waiting_room/?id=2`
+- Waiting Room 11: `http://localhost/demo/waiting_room/?id=3`
+- BAR: `http://localhost/demo/waiting_room/?id=4`
+- Room 1 display: `http://localhost/demo/room_display/?id=1`
 
-The development gateway exposes four browser clients: operator station, check-in
-Totem, Room display and waiting-room display. They are development-only clients
-and are not included in the Python package.
+There is no login in the current slice. Room and Queue selection belong to the
+operator client; URL parameters can preselect them, but AZFlow does not persist
+an operator workstation selection.
 
-The operator LIST includes WAITING, SUSPENDED, CALLED and ADMITTED accesses.
-Actions depend on the current state: WAITING can be called or suspended,
-SUSPENDED can be called directly or restored, CALLED can be cancelled or
-admitted, and ADMITTED can be recalled.
+The seed represents an in-progress working day: 30 Patients have already
+checked in, including historical and active calls, while `DEMO031` to `DEMO080`
+have appointments but have not yet arrived. `DEMO041`, `DEMO052`, `DEMO061`,
+`DEMO067` and `DEMO074` each have two appointments.
 
-## Demo snapshot
+The display topology is:
 
-The demo starts in the middle of a working day:
-- 30 Patients have already checked in;
-- 17 are ADMITTED, 3 are CALLED and 10 are WAITING;
-- 50 more Patients have appointments today but have not checked in;
-- five of those 50 have two appointments; the others have one;
-- five Agendas and multiple Queues exercise both ordering policies.
+```text
+HOSPITAL
+├── Totem 1
+├── BAR                         [WaitingRoomMonitor 4: whole hospital]
+├── Ground Floor
+│   ├── Waiting Room 1          [WaitingRoomMonitor 1]
+│   ├── Waiting Room 2          [WaitingRoomMonitor 2]
+│   ├── Room 1                  [RoomMonitor 1]
+│   └── Room 2                  [RoomMonitor 2]
+└── First Floor
+    ├── Waiting Room 11         [WaitingRoomMonitor 3]
+    └── Room 11                 [RoomMonitor 3]
+```
 
-Topology:
+## 1. Open an in-progress day
 
-    HOSPITAL
-    |-- Totem 1
-    |-- BAR (whole-hospital waiting-room monitor)
-    |-- Ground Floor
-    |   |-- Waiting Room 1
-    |   |-- Waiting Room 2
-    |   |-- Room 1
-    |   '-- Room 2
-    '-- First Floor
-        |-- Waiting Room 11
-        '-- Room 11
+Open the Operator and a few display tabs immediately after the reset.
 
-## Main operational scenarios
+Expected:
 
-### S01 - Open the mid-morning system
-Initial: fresh demo reset.
-Action: open the operator UI and display pages.
-Expected: existing calls are visible from persisted history; 10 accesses remain
-WAITING and future Patients do not appear because they have not checked in.
-Shows: realistic operational snapshot and separation between appointments and presence.
+- existing calls are reconstructed from persisted state;
+- WAITING, CALLED and ADMITTED entries are already visible in the operational
+  data;
+- Patients that have appointments but have not checked in do not appear in an
+  operational Queue;
+- each Room already has one active seeded call, demonstrating recovery after a
+  client reconnect rather than relying on a live WebSocket event.
 
-### S02 - Select Room and Queue
-Action: select Room 2 and Queue 2.
-Expected: subsequent calls use Room 2; LIST shows Queue 2 operational entries.
-Change to Queue 4 without changing Room.
-Expected: LIST changes immediately to Queue 4 data.
-Shows: Room and Queue are independent client selections.
+Before making a new call from Room 1, admit its current seeded call so the Room
+is free. The UI deliberately allows only one active call per Room.
 
-### S03 - Remember Room locally
-Action: select Room 2, close/reopen the operator page.
-Expected: the browser can preselect Room 2 from local client state.
-Shows: convenience only; AZFlow does not persist the operator's Room selection.
+## 2. Check-in, idempotency and multiple appointments
 
-### S04 - Normal check-in
-Initial: DEMO032 has one valid appointment and has not arrived.
-Action: check in DEMO032 at Totem 1.
-Expected: one DailyPresence, one ServiceAccess and one public call code.
-Shows: appointment lookup, Totem origin and creation of operational presence.
+At Totem 1, check in `DEMO032`.
 
-### S05 - Late Patient in BY_APPOINTMENT
-Initial: a Patient with a later appointment is already WAITING.
-DEMO031 has an earlier appointment but has not yet arrived.
-Action: check in DEMO031, select the relevant BY_APPOINTMENT Queue and press NEXT.
-Expected: DEMO031 is called first despite arriving later.
-Shows: scheduled time controls BY_APPOINTMENT ordering.
+Expected: one DailyPresence, one ServiceAccess and one public call code are
+created. Check in `DEMO032` again and the same operational objects and code are
+reused rather than duplicated.
 
-### S06 - Arrival order in BY_ARRIVAL
-Initial: two Patients are WAITING in a BY_ARRIVAL Queue and their DailyPresences
-were created in a known order.
-Action: press NEXT.
-Expected: the earlier arrival is called first even if the other appointment is earlier.
-Shows: arrival order is independent from appointment time.
+Then check in `DEMO041`, which has two appointments on different Agendas.
 
-### S07 - Multi-appointment check-in
-Initial: DEMO041 has two appointments on different Agendas.
-Action: check in DEMO041 once.
-Expected: one DailyPresence and public code, but two ServiceAccesses.
-Shows: one physical arrival can create multiple service accesses.
+Expected: one DailyPresence and one public call code are shared by two
+ServiceAccesses. In the Operator UI, switch between the relevant Queues and
+observe that the same public code identifies both accesses. Queue selection
+changes the operational view; it does not create a new check-in.
 
-### S08 - Same code in different Queues
-Initial: S07 completed and the two Agendas are visible through relevant Queues.
-Action: inspect both Queue lists.
-Expected: both ServiceAccesses use DEMO041's same public call code.
-Shows: public call identity belongs to DailyPresence.
+## 3. Compare Queue policies
 
-### S09 - NEXT
-Initial: several WAITING entries exist in the selected Queue.
-Action: press NEXT from Room 1.
-Expected: the first entry according to Queue policy becomes CALLED in Room 1
-and disappears from the callable WAITING set.
-Shows: Queue ordering and call-time Room.
+Queue 1 is `BY_APPOINTMENT`. `DEMO031` is deliberately configured as an early
+appointment arriving late. Check in `DEMO031`, select Queue 1 and use NEXT from
+a free Room.
 
-### S10 - Direct CALL from LIST
-Initial: several WAITING entries exist.
-Action: expand LIST and CALL an entry that is not first.
-Expected: that specific ServiceAccess becomes CALLED in the selected Room.
-Shows: operator override through call-specific.
+Expected: `DEMO031` is selected before later appointments even though it has
+just arrived.
 
-### S11 - Suspend from LIST
-Initial: a WAITING entry is visible.
-Action: press SUSPEND.
-Expected: state becomes SUSPENDED; it is not eligible for NEXT.
-Shows: temporary exclusion from calling without deleting the ServiceAccess.
+Queue 3 is `BY_ARRIVAL`. After freeing the Room if necessary, select Queue 3 and
+use NEXT.
 
-### S12 - Restore from LIST
-Initial: a SUSPENDED entry is visible in the operator list.
-Action: press RESTORE.
-Expected: state becomes WAITING and normal Queue ordering applies again.
-Shows: restoration does not create a new access or artificial priority.
+Expected: the earliest checked-in eligible access is selected independently of
+appointment time.
 
-### S13 - CALL a suspended Patient with one UI click
-Initial: a SUSPENDED entry is visible.
-Action: press CALL on that entry.
-Expected: the ServiceAccess moves atomically from SUSPENDED to CALLED in the
-selected Room.
-Shows: direct calling of a suspended access without an intermediate WAITING state.
+This demonstrates that the same calling operation is driven by the Queue policy
+rather than by a fixed global ordering rule.
 
-### S14 - Admission
-Initial: a ServiceAccess is CALLED into Room 1.
-Action: confirm admission.
-Expected: state becomes ADMITTED and the persisted call-time Room is returned.
-Shows: admission reuses the Room chosen at call time.
+## 4. Exercise the operator state lifecycle
 
-### S15 - Cancel a call
-Initial: a ServiceAccess is CALLED into a Room.
-Action: press CANCEL.
-Expected: state returns to WAITING and the active Room display is cleared.
-Shows: a call can be cancelled without creating a new ServiceAccess.
+Use LIST on a Queue containing WAITING entries and choose one access for the
+following short sequence:
 
-### S16 - Recall an admitted Patient
-Initial: a ServiceAccess is ADMITTED and retains its persisted call-time Room.
-Action: press RECALL.
-Expected: state returns to CALLED in the same Room and relevant displays show the call again.
-Shows: admission and recall form a reversible operational loop.
+1. SUSPEND it: the state becomes SUSPENDED and it is excluded from NEXT.
+2. RESTORE it: the state returns to WAITING without creating another access.
+3. SUSPEND it again, then CALL it directly: the current implementation performs
+   the direct `SUSPENDED -> CALLED` transition and associates the selected Room.
+4. ADMIT it: the state becomes ADMITTED and the Room becomes available again.
+5. RECALL it: the access becomes CALLED again in the same persisted Room.
+6. CANCEL the recalled call: the access returns to WAITING.
 
-### S17 - Appointment timing after call
-Initial: a BY_APPOINTMENT entry has a scheduled appointment time.
-Action: call it, then admit or recall it later.
-Expected: the timing indicator is based on the first call time and does not change
-as wall-clock time advances or when the Patient is recalled.
-Shows: persisted first-call history keeps the operator timing indicator stable.
+A WAITING entry that is not first in the Queue can also be called directly from
+LIST, showing the explicit operator override of NEXT ordering.
 
-### S18 - Switch Queue with already checked-in Patients
-Initial: Room 2 is selected. Queue 2 and Queue 4 contain different accesses
-created by Patients who are already inside HOSPITAL.
-Action: view Queue 2, then switch the selector to Queue 4.
-Expected: Queue 4's existing Patients appear immediately; no new check-in occurs.
-Shows: Queue selection changes the operator's working view, not domain state.
+For a `BY_APPOINTMENT` Queue, observe that the appointment timing after a call
+uses the persisted first-call time; a later recall does not reset that reference.
 
-## Display and topology scenarios
+## 5. Show live displays, topology and reconnect
 
-### S19 - Ground Floor scope
-Action: call a Patient into Room 1.
-Expected: Waiting Room 1, Waiting Room 2 and BAR receive the call;
-Waiting Room 11 does not.
-Shows: both Ground Floor monitors share the Ground Floor scope.
+Keep Waiting Room 1, Waiting Room 2, Waiting Room 11, BAR and the Room 1 display
+open. Make a new call into Room 1.
 
-### S20 - Second Ground Floor Room
-Action: call a Patient into Room 2.
-Expected: Waiting Room 1, Waiting Room 2 and BAR receive the call;
-Waiting Room 11 does not.
-Shows: scope follows topology rather than a fixed Room binding.
+Expected:
 
-### S21 - First Floor isolation
-Action: call a Patient into Room 11.
-Expected: Waiting Room 11 and BAR receive the call; Ground Floor monitors do not.
-Shows: sibling topology branches remain isolated.
+- Waiting Room 1 and Waiting Room 2 receive the call because both cover the
+  Ground Floor;
+- BAR receives the call because its scope is the HOSPITAL root;
+- Waiting Room 11 does not receive it because it belongs to the First Floor;
+- Room 1 display shows the call, while other Room displays do not.
 
-### S22 - BAR catch-all
-Action: make calls into Room 1, Room 2 and Room 11.
-Expected: BAR receives all three.
-Shows: a monitor scoped to HOSPITAL covers every descendant Room.
+The update should arrive live through WebSocket. Close one relevant display,
+change the state if useful, then reopen it.
 
-### S23 - Room display isolation
-Action: make separate calls into Room 1, Room 2 and Room 11.
-Expected: each RoomMonitor shows only the latest call for its own Room.
-Shows: over-door display binding.
+Expected: the initial view is rebuilt from persisted operational history. The
+WebSocket is a notification channel, not the source of truth.
 
-### S24 - Live display update
-Initial: relevant display WebSockets are connected.
-Action: make a call.
-Expected: covered waiting-room and Room displays receive a live call message.
-Shows: real-time publication.
+Public displays and operational responses use the public call code and do not
+expose the Patient Identifier.
 
-### S25 - Reconnect display
-Initial: calls already happened while the display was closed.
-Action: reconnect the display.
-Expected: its initial snapshot is rebuilt from persisted call history.
-Shows: WebSocket delivery is not the source of truth.
+## 6. Optional edge checks
 
-### S26 - Privacy on operator/display output
-Action: inspect Queue and display responses during the scenarios.
-Expected: public call code and operational data are exposed, not Patient identifiers.
-Shows: privacy boundary of operational/read interfaces.
+These are useful when there is extra time; they are not required for the normal
+walkthrough.
 
-## Check-in and configuration edge scenarios
+| Check | Action | Expected result |
+| --- | --- | --- |
+| Unknown Patient | Check in an identifier outside the demo set | No operational presence is created |
+| Unknown Totem | Open the Totem with an unconfigured `id` and try a valid Patient | Configuration/check-in is rejected |
+| Repeated multi-appointment check-in | Check in `DEMO041` again | Still one DailyPresence and two ServiceAccesses |
+| Inactive Queue | Use Queue `99` through Swagger/API | Queue is rejected as inactive |
+| Empty Queue | Use NEXT on a Queue with no WAITING access | No-patient conflict is returned |
+| Invalid transition | Admit a non-CALLED access or restore a non-SUSPENDED access | Transition is rejected |
+| Unknown Room | Call using an unconfigured Room reference through Swagger/API | Call is rejected |
+| Unknown display | Connect a display with an unconfigured monitor id | WebSocket is closed with the unknown-monitor application code |
 
-### E01 - Unknown Patient
-Action: check in an identifier absent from the mock source.
-Expected: 404 and no DailyPresence.
+## Demo data notes
 
-### E02 - Unknown Totem
-Action: check in a valid Patient with an unknown Totem reference.
-Expected: 400 and no check-in data.
+The primary Queues are intentionally mixed:
 
-### E03 - Repeated check-in
-Action: check in the same Patient twice on the same day.
-Expected: existing DailyPresence/public code and ServiceAccesses are reused.
+- Queue 1: `BY_APPOINTMENT`, Diagnostics;
+- Queue 2: `BY_APPOINTMENT`, Cardiology;
+- Queue 3: `BY_ARRIVAL`, Oncology;
+- Queue 4: `BY_APPOINTMENT`, Blood Tests;
+- Queue 5: `BY_ARRIVAL`, Radiotherapy;
+- Queue 6: cross-cover Queue for Cardiology and Blood Tests;
+- Queue 99: inactive configuration used only for edge demonstrations.
 
-### E04 - Multi-appointment repeated check-in
-Action: check in DEMO041 twice.
-Expected: still one DailyPresence and two ServiceAccesses, with no duplicates.
+The `SEEDxxx` Patients provide the in-progress context and are not intended to be
+typed at the Totem. The `DEMOxxx` identifiers are the not-yet-arrived Patients
+used during the walkthrough.
 
-### E05 - Inactive Queue
-Action: view or call the inactive demo Queue.
-Expected: 409 queue is not active.
+## Traceability aliases
 
-### E06 - Empty Queue
-Action: press NEXT when no WAITING access is available.
-Expected: 409 no patient to call.
+Earlier report drafts refer to the original fine-grained demo identifiers. They
+are retained here only as aliases; they no longer represent separate steps that
+must all be executed during a demonstration.
 
-### E07 - Specific access outside selected Queue
-Action: call-specific an access not visible through the selected Queue.
-Expected: 404 service access not found in queue.
-
-### E08 - Call non-callable state
-Action: call-specific a CALLED or ADMITTED access.
-Expected: 409 service access is not callable.
-
-### E09 - Invalid state transitions
-Action: admit a non-CALLED access, restore a non-SUSPENDED access, or suspend
-a non-WAITING access.
-Expected: 409 for each invalid transition.
-
-### E10 - Unknown Room
-Action: call using an unknown Room reference.
-Expected: 409 room is not configured.
-
-### E11 - Unknown display monitor
-Action: connect using an unknown monitor id.
-Expected: WebSocket closes with the unknown-monitor application code.
-
-
-## Deterministic demo Patients
-
-DEMO031..DEMO080 are not checked in at reset time and exist only in the mock
-appointment source until they arrive. DEMO041, DEMO052, DEMO061, DEMO067 and
-DEMO074 have two appointments. The remaining 45 have one.
-
-DEMO031 is intentionally an early appointment arriving late for S05.
-Other identifiers are distributed across the five Agendas so the operator can
-check in new Patients throughout the demo without emptying the background data.
-
-The 30 SEED Patients are already inside at reset time. They provide historical
-calls, current calls and the ten initial WAITING entries. They are context data,
-not identifiers intended to be typed at the Totem.
-
-## Future work explicitly outside 1.2
-
-- Login and authentication.
-- Per-user Queue authorization/filtering.
-- Persisting operator Room or Queue selection in AZFlow.
+| Previous identifiers | Covered by the current walkthrough |
+| --- | --- |
+| S01 | 1. Open an in-progress day |
+| S02–S10, S18 | 2–3. Check-in, Queue policy and operator calling |
+| S11–S17 | 4. Operator state lifecycle |
+| S19–S26 | 5. Displays, topology, reconnect and privacy |
+| E01–E11 | 6. Optional edge checks, with repeated check-in also shown in section 2 |
