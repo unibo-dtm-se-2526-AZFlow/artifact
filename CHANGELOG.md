@@ -1,3 +1,18 @@
+## [2.0.1](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v2.0.0...v2.0.1) (2026-10-07)
+
+### Documentation
+
+* **demo:** streamline walkthrough scenarios ([d87b7be](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/d87b7be582b2316e4f4dd838b3d4f4883cea921f))
+* **package:** simplify TestPyPI README ([277f513](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/277f513059f7d30ac503383296a320203a219e0c))
+
+### Tests
+
+* **api:** cover production composition wiring ([cdc1741](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/cdc1741578b3f931b7664ab3fe7f8b6f9233830a))
+
+### General maintenance
+
+* **dev:** fix VS Code pytest discovery ([b120424](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/b1204243df3dbc24f3713718ce5390c402861864))
+
 ## [2.0.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v1.2.0...v2.0.0) (2026-10-04)
 
 ### ⚠ BREAKING CHANGES
