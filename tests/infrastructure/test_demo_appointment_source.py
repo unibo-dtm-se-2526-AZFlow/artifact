@@ -2,8 +2,8 @@ from datetime import date, datetime
 
 from AZFlow.application.ports.appointment_source import ExternalAppointmentData
 from AZFlow.domain.patient_identifier import FISCAL_CODE, PatientIdentifier
-from AZFlow.infrastructure.appointment_sources.mock import (
-    MockAppointmentSource,
+from AZFlow.infrastructure.appointment_sources.demo import (
+    DemoAppointmentSource,
 )
 
 
@@ -12,7 +12,7 @@ OPERATIONAL_DAY = date(2024, 3, 15)
 
 
 def test_returns_appointments_for_known_identifier():
-    source = MockAppointmentSource()
+    source = DemoAppointmentSource()
 
     appointments = source.find_for_day(KNOWN_IDENTIFIER, OPERATIONAL_DAY)
 
@@ -23,14 +23,14 @@ def test_returns_appointments_for_known_identifier():
 
 
 def test_returns_empty_for_unknown_identifier():
-    source = MockAppointmentSource()
+    source = DemoAppointmentSource()
     unknown = PatientIdentifier(type=FISCAL_CODE, value="UNKNOWN00A00A000A")
 
     assert source.find_for_day(unknown, OPERATIONAL_DAY) == []
 
 
 def test_is_deterministic_for_the_same_input():
-    source = MockAppointmentSource()
+    source = DemoAppointmentSource()
 
     first = source.find_for_day(KNOWN_IDENTIFIER, OPERATIONAL_DAY)
     second = source.find_for_day(KNOWN_IDENTIFIER, OPERATIONAL_DAY)
@@ -39,7 +39,7 @@ def test_is_deterministic_for_the_same_input():
 
 
 def test_returns_appointments_on_the_requested_operational_day():
-    source = MockAppointmentSource()
+    source = DemoAppointmentSource()
 
     appointments = source.find_for_day(KNOWN_IDENTIFIER, OPERATIONAL_DAY)
 
@@ -50,7 +50,7 @@ def test_returns_appointments_on_the_requested_operational_day():
 
 
 def test_external_appointment_reference_is_stable_across_days():
-    source = MockAppointmentSource()
+    source = DemoAppointmentSource()
 
     day_one = source.find_for_day(KNOWN_IDENTIFIER, date(2024, 3, 15))
     day_two = source.find_for_day(KNOWN_IDENTIFIER, date(2024, 3, 16))
@@ -71,7 +71,7 @@ def test_accepts_a_custom_appointment_mapping():
             )
         ]
     }
-    source = MockAppointmentSource(appointments=custom)
+    source = DemoAppointmentSource(appointments=custom)
     identifier = PatientIdentifier(type=FISCAL_CODE, value="CST0000000000000")
 
     appointments = source.find_for_day(identifier, OPERATIONAL_DAY)

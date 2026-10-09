@@ -41,7 +41,7 @@ from AZFlow.api.v1.ws_support import WebSocketDisplaySupport, set_ws_support
 from AZFlow.application.calling import CallingService
 from AZFlow.application.check_in import CheckInService
 from AZFlow.application.state_management import StateManagementService
-from AZFlow.infrastructure.appointment_sources.mock import MockAppointmentSource
+from AZFlow.infrastructure.appointment_sources.demo import DemoAppointmentSource
 from AZFlow.infrastructure.events.websocket_call_hub import WebSocketCallHub
 from AZFlow.infrastructure.persistence.postgres_call_repository import (
     PostgresCallRepository,
@@ -132,7 +132,7 @@ def wired_client(connection, dsn: str) -> Iterator[TestClient]:
     """Wire the real services over the test DB and WebSocket hub."""
     seeded = _seed_topology(connection)
 
-    appointment_source = MockAppointmentSource()
+    appointment_source = DemoAppointmentSource()
 
     @contextmanager
     def open_read_model():

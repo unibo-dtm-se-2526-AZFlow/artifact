@@ -124,7 +124,7 @@ def _demo_appointments(
     return result
 
 
-class MockAppointmentSource:
+class DemoAppointmentSource:
     """In-memory appointment source used for development and tests
 
     The same identifier always returns the same appointments. The requested

@@ -1,14 +1,13 @@
-"""API dependencies
+"""API dependencies.
 
-This module connects the API to the mock appointment source and PostgreSQL
-adapters. A database connection is opened for each request and closed when
-the request ends.
+The composition root selects configured appointment sources and wires
+PostgreSQL adapters. Database connections are scoped to requests.
 """
 
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Callable, ContextManager, Iterator
+from typing import Callable, ContextManager, Iterator, Sequence
 
 from fastapi import FastAPI, HTTPException, status
 
@@ -22,11 +21,12 @@ from AZFlow.api.v1.state_management import get_state_management_service
 from AZFlow.application.calling import CallingService
 from AZFlow.application.check_in import CheckInService
 from AZFlow.application.operator_queue_list import OperatorQueueListService
+from AZFlow.application.ports.appointment_source import AppointmentSource
 from AZFlow.application.ports.call_event_publisher import CallEventPublisher
 from AZFlow.application.ports.display_read_model import DisplayReadModel
 from AZFlow.application.queue_view import QueueViewService
 from AZFlow.application.state_management import StateManagementService
-from AZFlow.infrastructure.appointment_sources.mock import MockAppointmentSource
+from AZFlow.infrastructure.appointment_sources.demo import DemoAppointmentSource
 from AZFlow.infrastructure.config import load_settings
 from AZFlow.api.v1.ws_support import WebSocketDisplaySupport, set_ws_support
 from AZFlow.infrastructure.events.websocket_call_hub import WebSocketCallHub
@@ -50,17 +50,35 @@ from AZFlow.infrastructure.persistence.postgres_state_transition_repository impo
 )
 
 
+def resolve_appointment_sources(configured: Sequence[str]) -> list[AppointmentSource]:
+    """Instantiate explicitly selected sources in numeric configuration order."""
+    sources: list[AppointmentSource] = []
+    seen: set[str] = set()
+    for identifier in configured:
+        code = identifier.strip().lower()
+        if code in seen:
+            raise ValueError(f"Duplicate appointment source: {identifier}")
+        seen.add(code)
+        if code == "demo":
+            sources.append(DemoAppointmentSource())
+        else:
+            raise ValueError(f"Unknown appointment source: {identifier}")
+    return sources
+
+
 def build_check_in_service_provider(
     database_url: object,
+    appointment_sources: Sequence[AppointmentSource] = (),
 ) -> Callable[[], Iterator[CheckInService]]:
-    """Build the CheckInService dependency used for each request
-
-    The mock appointment source is shared. Each request gets a new PostgreSQL
-    connection. A missing database URL returns HTTP 503.
-    """
-    appointment_source = MockAppointmentSource()
+    """Provide CheckInService with selected sources and request-scoped storage."""
+    sources = list(appointment_sources)
 
     def provide_check_in_service() -> Iterator[CheckInService]:
+        if not sources:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="appointment source is not configured",
+            )
         if not database_url:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -72,7 +90,7 @@ def build_check_in_service_provider(
 
         with psycopg.connect(str(database_url)) as connection:
             repository = PostgresCheckInRepository(connection)
-            yield CheckInService([appointment_source], repository)
+            yield CheckInService(sources, repository)
 
     return provide_check_in_service
 
@@ -84,7 +102,10 @@ def wire_check_in(application: FastAPI) -> None:
     """
     settings = load_settings()
     application.dependency_overrides[get_check_in_service] = (
-        build_check_in_service_provider(settings.database_url)
+        build_check_in_service_provider(
+            settings.database_url,
+            resolve_appointment_sources(settings.appointment_sources),
+        )
     )
 
 

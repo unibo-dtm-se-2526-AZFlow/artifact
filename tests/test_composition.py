@@ -29,6 +29,7 @@ from AZFlow.application.check_in import CheckInService
 from AZFlow.application.operator_queue_list import OperatorQueueListService
 from AZFlow.application.queue_view import QueueViewService
 from AZFlow.application.state_management import StateManagementService
+from AZFlow.infrastructure.appointment_sources.demo import DemoAppointmentSource
 from AZFlow.infrastructure.events.websocket_call_hub import WebSocketCallHub
 from AZFlow.infrastructure.persistence.postgres_call_repository import (
     PostgresCallRepository,
@@ -94,11 +95,15 @@ def test_providers_build_the_real_application_graph(fake_database) -> None:
     display_publisher: Any = object()
 
     check_in = _next_and_close(
-        composition.build_check_in_service_provider(database_url)
+        composition.build_check_in_service_provider(
+            database_url, [DemoAppointmentSource()]
+        )
     )
     assert isinstance(check_in, CheckInService)
     assert isinstance(check_in._repository, PostgresCheckInRepository)
     assert check_in._repository._conn is connection
+    assert len(check_in._appointment_sources) == 1
+    assert isinstance(check_in._appointment_sources[0], DemoAppointmentSource)
 
     queue_view = _next_and_close(
         composition.build_queue_view_service_provider(database_url)
@@ -158,7 +163,9 @@ def test_providers_build_the_real_application_graph(fake_database) -> None:
 @pytest.mark.parametrize(
     "make_dependency",
     [
-        lambda: composition.build_check_in_service_provider(None)(),
+        lambda: composition.build_check_in_service_provider(
+            None, [DemoAppointmentSource()]
+        )(),
         lambda: composition.build_queue_view_service_provider(None)(),
         lambda: composition.build_operator_queue_list_service_provider(None)(),
         lambda: composition.build_operator_discovery_read_model_provider(None)(),
@@ -183,12 +190,89 @@ def test_display_factory_fails_closed_without_database_url() -> None:
     assert error.value.status_code == 503
 
 
+def test_no_appointment_sources_returns_503_without_opening_database(
+    fake_database,
+) -> None:
+    _, urls = fake_database
+    dependency = composition.build_check_in_service_provider("postgresql://unused")()
+    with pytest.raises(HTTPException) as error:
+        next(dependency)
+    assert error.value.status_code == 503
+    assert error.value.detail == "appointment source is not configured"
+    assert urls == []
+
+
+def test_resolve_appointment_sources() -> None:
+    assert composition.resolve_appointment_sources(()) == []
+    sources = composition.resolve_appointment_sources((" demo ",))
+    assert len(sources) == 1
+    assert isinstance(sources[0], DemoAppointmentSource)
+
+    for value in (("unknown",), ("demo", "unknown"), ("demo", "DEMO")):
+        with pytest.raises(ValueError):
+            composition.resolve_appointment_sources(value)
+
+
+def test_check_in_returns_503_when_source_is_not_selected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        composition,
+        "load_settings",
+        lambda: SimpleNamespace(
+            database_url="postgresql://unused",
+            appointment_sources=(),
+            display_recent_calls_max=10,
+        ),
+    )
+    application = create_app()
+    with TestClient(application) as client:
+        response = client.post(
+            "/api/v1/check-ins",
+            json={"identifier_type": "fiscal_code", "identifier_value": "DEMO031"},
+        )
+    assert response.status_code == 503
+    assert response.json() == {"detail": "appointment source is not configured"}
+
+
+def test_postgres_connection_failure_returns_503_without_startup_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        composition,
+        "load_settings",
+        lambda: SimpleNamespace(
+            database_url="postgresql://unavailable",
+            appointment_sources=("demo",),
+            display_recent_calls_max=10,
+        ),
+    )
+
+    def database_down(_url: str) -> None:
+        raise psycopg.OperationalError("connection refused")
+
+    monkeypatch.setattr(psycopg, "connect", database_down)
+
+    application = create_app()
+    with TestClient(application) as client:
+        health = client.get("/api/v1/health")
+        response = client.post(
+            "/api/v1/check-ins",
+            json={"identifier_type": "fiscal_code", "identifier_value": "DEMO031"},
+        )
+
+    assert health.status_code == 200
+    assert response.status_code == 503
+    assert response.json() == {"detail": "database unavailable"}
+
+
 def test_create_app_wires_all_production_dependencies(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = SimpleNamespace(
         database_url="postgresql://azflow:test@localhost/azflow_test",
         display_recent_calls_max=12,
+        appointment_sources=("demo",),
     )
     monkeypatch.setattr(composition, "load_settings", lambda: settings)
 

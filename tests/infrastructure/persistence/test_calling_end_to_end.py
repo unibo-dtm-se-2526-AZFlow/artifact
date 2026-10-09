@@ -26,7 +26,7 @@ from AZFlow.api.v1.calling import get_calling_service
 from AZFlow.api.v1.check_in import get_check_in_service
 from AZFlow.application.calling import CallingService
 from AZFlow.application.check_in import CheckInService
-from AZFlow.infrastructure.appointment_sources.mock import MockAppointmentSource
+from AZFlow.infrastructure.appointment_sources.demo import DemoAppointmentSource
 from tests.application.fakes import CallEventPublisherSpy
 from AZFlow.infrastructure.persistence.postgres_call_repository import (
     PostgresCallRepository,
@@ -75,7 +75,7 @@ def wired_client(connection, dsn: str) -> Iterator[TestClient]:
     node_id = seed_location_node(connection, "Radiotherapy")
     seed_room(connection, node_id, _ROOM, "Room 3")
 
-    appointment_source = MockAppointmentSource()
+    appointment_source = DemoAppointmentSource()
     publisher = CallEventPublisherSpy()
 
     def provide_check_in() -> Iterator[CheckInService]:

@@ -3,6 +3,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    # Forward all numbered appointment-source variables without enumerating them.
+    env_file:
+      - path: .env
+        required: false
     environment:
       AZFLOW_API_HOST: ${AZFLOW_API_HOST:-0.0.0.0}
       AZFLOW_API_PORT: ${AZFLOW_API_PORT:-8000}

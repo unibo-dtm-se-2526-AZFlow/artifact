@@ -4,7 +4,9 @@ import asyncio
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from fastapi import FastAPI
+import psycopg
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from AZFlow.api.composition import (
     wire_calling,
@@ -31,6 +33,14 @@ async def _lifespan(application: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     """Create the FastAPI application"""
     application = FastAPI(title="AZFlow", lifespan=_lifespan)
+
+    @application.exception_handler(psycopg.OperationalError)
+    async def database_unavailable(
+        _request: Request, _error: psycopg.OperationalError
+    ) -> JSONResponse:
+        """Report connectivity failures without exposing database details."""
+        return JSONResponse(status_code=503, content={"detail": "database unavailable"})
+
     application.include_router(v1_router)
     wire_check_in(application)
     wire_queue_view(application)

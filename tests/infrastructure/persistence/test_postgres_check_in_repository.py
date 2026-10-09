@@ -20,7 +20,7 @@ import pytest
 from AZFlow.application.check_in import CheckInService
 from AZFlow.application.errors import NoAppointmentAvailableError
 from AZFlow.application.ports.appointment_source import ExternalAppointmentData
-from AZFlow.infrastructure.appointment_sources.mock import MockAppointmentSource
+from AZFlow.infrastructure.appointment_sources.demo import DemoAppointmentSource
 from AZFlow.domain.patient_identifier import FISCAL_CODE, PatientIdentifier
 from AZFlow.infrastructure.persistence.postgres_check_in_repository import (
     PostgresCheckInRepository,
@@ -356,7 +356,7 @@ def test_disabled_source_appointment_is_ignored_before_operational_creation(
         )
     connection.commit()
 
-    appointment_source = MockAppointmentSource(
+    appointment_source = DemoAppointmentSource(
         {IDENTIFIER.value: [_appointment_data("MOCK-APPT-DISABLED")]}
     )
     repository = PostgresCheckInRepository(connection)
