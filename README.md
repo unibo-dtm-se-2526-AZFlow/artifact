@@ -73,8 +73,12 @@ Create the local environment configuration:
 cp .env.example .env
 ~~~
 
-The default configuration is suitable for local development. Adjust `.env` if
-different ports or database settings are required.
+The example enables the synthetic appointment source with
+`AZFLOW_APPOINTMENT_SOURCE_1=demo`. Numbering is sparse: `_1000=demo` works
+without indices 1-999. An unset source list disables check-in (HTTP 503).
+Selecting `demo` does not seed PostgreSQL; `poe dev-reset` explicitly loads
+the local demonstration dataset.
+Adjust `.env` if different ports or database settings are required.
 
 Prepare the deterministic demo database:
 

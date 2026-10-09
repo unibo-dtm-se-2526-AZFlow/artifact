@@ -1,5 +1,5 @@
 -- Development/demo data for the AZFlow 1.1 in-progress-day scenario
--- The matching not-yet-arrived appointments live in MockAppointmentSource.
+-- The matching not-yet-arrived appointments live in DemoAppointmentSource.
 
 BEGIN;
 

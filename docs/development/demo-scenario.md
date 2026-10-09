@@ -28,6 +28,6 @@ poetry run poe dev
 
 Open the demo clients at `http://localhost/demo/`. The development seed
 represents Patients already inside HOSPITAL. Future Patients exist in
-`MockAppointmentSource` and enter the operational model only when they check in.
+`DemoAppointmentSource` and enter the operational model only when they check in.
 
 Authentication and per-user Queue filtering are future work.
