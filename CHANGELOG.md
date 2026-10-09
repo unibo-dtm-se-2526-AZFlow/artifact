@@ -1,3 +1,21 @@
+## [3.0.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v2.0.1...v3.0.0) (2026-10-09)
+
+### ⚠ BREAKING CHANGES
+
+* **config:** Appointment sources must now be configured explicitly using AZFLOW_APPOINTMENT_SOURCE_<n>. The previously automatic MockAppointmentSource is now named DemoAppointmentSource and is enabled by configuring a source as "demo".
+
+### Features
+
+* **config:** support numbered appointment sources and demo adapter ([d700d64](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/d700d64f8dd293ca90cb4abadf3724dc6b8317cd))
+
+### Documentation
+
+* **demo:** document source configuration and versioned demo seed ([850992f](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/850992fda4dab1b3677e68374b640ee557889f63))
+
+### Build and continuous integration
+
+* **package:** exclude Alembic development files from distributions ([b78d118](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/b78d11846b9671df0d2952b5b5173a95fba485ff))
+
 ## [2.0.1](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v2.0.0...v2.0.1) (2026-10-07)
 
 ### Documentation
