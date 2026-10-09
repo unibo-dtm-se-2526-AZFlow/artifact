@@ -3,6 +3,12 @@ name = "AZFlow"
 packages = [
     { include = "AZFlow" },
 ]
+# Alembic revision scaffolding stays in the Git repository for developers.
+# It is not required to apply packaged migrations.
+exclude = [
+    "AZFlow/migrations/README",
+    "AZFlow/migrations/script.py.mako",
+]
 version = "2.0.1"
 description = "AZFlow, a healthcare queue management system for outpatient environments"
 authors = ["Andrea Zaccheroni <andrea.zaccheroni@studio.unibo.it>"]
