@@ -1,3 +1,5 @@
+"""Unit tests for service access state transitions and invalid operations."""
+
 from datetime import date, datetime
 
 import pytest

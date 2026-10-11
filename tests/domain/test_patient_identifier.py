@@ -1,9 +1,14 @@
+"""Unit tests for patient identifier validation and immutability."""
+
 import dataclasses
 
 import pytest
 
 from AZFlow.domain.errors import EmptyIdentifierValueError
 from AZFlow.domain.patient_identifier import FISCAL_CODE, PatientIdentifier
+
+
+# Identifier values and validation
 
 
 def test_fiscal_code_identifier_is_supported():
@@ -18,11 +23,17 @@ def test_empty_value_raises_domain_error():
         PatientIdentifier(type=FISCAL_CODE, value="")
 
 
+# Identifier immutability
+
+
 def test_identifier_is_immutable():
     identifier = PatientIdentifier(type=FISCAL_CODE, value="RSSMRA80A01H501U")
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         identifier.value = "other"  # type: ignore[misc]
+
+
+# Identifier type handling
 
 
 def test_identifier_exposes_arbitrary_type_without_rejecting_it():

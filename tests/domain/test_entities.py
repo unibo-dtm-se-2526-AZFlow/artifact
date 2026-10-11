@@ -1,3 +1,5 @@
+"""Unit tests for core domain entities and their invariants."""
+
 import dataclasses
 from datetime import date, datetime
 
@@ -23,6 +25,9 @@ def _external_agenda():
     return ExternalAgenda(agenda=agenda, source=source, source_name="Cardiology")
 
 
+# Agenda and external agenda
+
+
 def test_agenda_name_can_change_after_creation():
     agenda = Agenda(id=1, name="Cardiology")
 
@@ -37,6 +42,9 @@ def test_external_agenda_owns_one_source_and_optional_references():
     assert external_agenda.source.id == 1
     assert external_agenda.agenda.name == "Cardiology"
     assert external_agenda.external_reference is None
+
+
+# Queue configuration and status
 
 
 def test_queue_status_and_policy_enums():
@@ -69,6 +77,9 @@ def test_queue_reports_active_status():
     assert inactive.is_active() is False
 
 
+# Appointment data
+
+
 def test_appointment_stores_check_in_identifier():
     appointment = Appointment(
         id=1,
@@ -80,6 +91,9 @@ def test_appointment_stores_check_in_identifier():
 
     assert appointment.patient_identifier == _identifier()
     assert appointment.external_appointment_reference == "ref-1"
+
+
+# Daily presence immutability
 
 
 def test_daily_presence_is_immutable():
@@ -94,6 +108,9 @@ def test_daily_presence_is_immutable():
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         presence.public_call_code = "AAA002"  # type: ignore[misc]
+
+
+# Service access initial state
 
 
 def test_service_access_starts_waiting():

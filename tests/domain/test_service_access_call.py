@@ -1,3 +1,5 @@
+"""Unit tests for calling a waiting service access."""
+
 from datetime import date, datetime
 
 import pytest
@@ -50,6 +52,9 @@ def _waiting_service_access():
     )
 
 
+# called() transition and immutability
+
+
 def test_called_transitions_waiting_to_called_copy():
     service_access = _waiting_service_access()
 
@@ -77,6 +82,9 @@ def test_called_leaves_original_unchanged():
     service_access.called()
 
     assert service_access.state is ServiceAccessState.WAITING
+
+
+# called() invalid transition
 
 
 def test_called_on_non_waiting_raises_with_service_access_id():
