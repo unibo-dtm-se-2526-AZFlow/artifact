@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AZFlow · Demo</title>
+  <link rel="stylesheet" href="shared/common.css">
+  <style>
+    .brand-line { display:flex; align-items:baseline; gap:10px; }
+    .demo-label { font-size:12px; font-weight:750; letter-spacing:.035em; color:#8793a0; }
+    .demo-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-top:24px; }
+    .demo-link { display:block; color:inherit; text-decoration:none; padding:22px; transition:transform .15s ease; }
+    .demo-link:hover { transform:translateY(-2px); }
+    .demo-link h2 { margin:0 0 10px; }
+    .demo-link p { margin:0; line-height:1.5; }
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header class="topbar">
+    <div><div class="brand-line"><span class="brand">AZFlow</span><span class="demo-label">[DEMO CLIENT]</span></div><h1>Demo navigation</h1></div>
+  </header>
+  <section class="demo-grid" aria-label="Demo clients">
+    <a class="card demo-link" href="totem/?id=1"><h2>Totem</h2><p>Check in a patient and generate a ticket.</p></a>
+    <a class="card demo-link" href="operator/?room=1&amp;queue=1"><h2>Operator</h2><p>Manage a queue and call patients to a room.</p></a>
+    <a class="card demo-link" href="room_display/?id=1"><h2>Room display</h2><p>Show calls for a room monitor.</p></a>
+    <a class="card demo-link" href="waiting_room/?id=1"><h2>Waiting room</h2><p>Show calls for a waiting-room monitor.</p></a>
+  </section>
+  <p class="muted">These links use the default demo device IDs. Change the URL parameters to open other rooms, queues or monitors.</p>
+</main>
+</body>
+</html>
