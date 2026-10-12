@@ -1,3 +1,13 @@
+## [3.1.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v3.0.0...v3.1.0) (2026-10-12)
+
+### Features
+
+* **demo:** add demo client navigation page ([3f472cd](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/3f472cd0c8b0950283def6f801d300e68e9403f6))
+
+### Tests
+
+* **domain:** document unit test scenarios ([11ab6cd](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/commit/11ab6cd6a3c38ffd3a8e4073b848e34c6e4cb744))
+
 ## [3.0.0](https://github.com/unibo-dtm-se-2526-AZFlow/artifact/compare/v2.0.1...v3.0.0) (2026-10-09)
 
 ### ⚠ BREAKING CHANGES

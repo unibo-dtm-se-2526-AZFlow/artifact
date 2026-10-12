@@ -9,7 +9,7 @@ exclude = [
     "AZFlow/migrations/README",
     "AZFlow/migrations/script.py.mako",
 ]
-version = "3.0.0"
+version = "3.1.0"
 description = "AZFlow, a healthcare queue management system for outpatient environments"
 authors = ["Andrea Zaccheroni <andrea.zaccheroni@studio.unibo.it>"]
 license = "Apache 2.0"
